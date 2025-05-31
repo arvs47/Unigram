@@ -84,7 +84,7 @@ Here is complete instruction for TDLib binaries building, taken from the officia
 > cd example/uwp
 > powershell -ExecutionPolicy ByPass ./build.ps1 -vcpkg_root ../../vcpkg -nupkg
 ```
-
+If getting error for gperf.exe paste this into system32 folder 
 The resulting .nupkg file must be copied into Unigram\Libraries.
 
 ### VLC
