@@ -4,6 +4,7 @@
 // Distributed under the GNU General Public License v3.0. (See accompanying
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
+using Telegram.Common;
 
 namespace Telegram.Services.Settings
 {
@@ -140,13 +141,6 @@ namespace Telegram.Services.Settings
             set => AddOrUpdateValue(ref _disablePackageManager, "DisablePackageManager", value);
         }
 
-        private bool? _sendLargePhotos;
-        public bool SendLargePhotos
-        {
-            get => _sendLargePhotos ??= GetValueOrDefault("SendLargePhotos", false);
-            set => AddOrUpdateValue(ref _sendLargePhotos, "SendLargePhotos", value);
-        }
-
         private bool? _useSpeexResampler;
         public bool UseSpeexResampler
         {
@@ -157,8 +151,71 @@ namespace Telegram.Services.Settings
         private bool? _forumTabsDebug;
         public bool ForumTabsDebug
         {
-            get => _forumTabsDebug ??= GetValueOrDefault("ForumTabsDebug", false);
+            get => _forumTabsDebug ??= GetValueOrDefault("ForumTabsDebug", Constants.DEBUG);
             set => AddOrUpdateValue(ref _forumTabsDebug, "ForumTabsDebug", value);
+        }
+
+        private bool? _bubbleTailDebug;
+        public bool BubbleTailDebug
+        {
+            get => _bubbleTailDebug ??= GetValueOrDefault("BubbleTailDebug", true);
+            set => AddOrUpdateValue(ref _bubbleTailDebug, "BubbleTailDebug", value);
+        }
+
+        private bool? _spoilerEffectDebug;
+        public bool SpoilerEffectDebug
+        {
+            get => _spoilerEffectDebug ??= GetValueOrDefault("SpoilerEffectDebug", true);
+            set => AddOrUpdateValue(ref _spoilerEffectDebug, "SpoilerEffectDebug", value);
+        }
+
+        private bool? _windowResizeDebug;
+        public bool WindowResizeDebug
+        {
+            get => _windowResizeDebug ??= GetValueOrDefault("WindowResizeDebug", Constants.DEBUG);
+            set => AddOrUpdateValue(ref _windowResizeDebug, "WindowResizeDebug", value);
+        }
+
+        private bool? _sparseMessagesDebug;
+        public bool SparseMessagesDebug
+        {
+            get => _sparseMessagesDebug ??= GetValueOrDefault("SparseMessagesDebug", true);
+            set => AddOrUpdateValue(ref _sparseMessagesDebug, "SparseMessagesDebug", value);
+        }
+
+        private bool? _savedMessagesDebug;
+        public bool SavedMessagesDebug
+        {
+            get => _savedMessagesDebug ??= GetValueOrDefault("SavedMessagesDebug", ApiInfo.IsPackagedRelease);
+            set => AddOrUpdateValue(ref _savedMessagesDebug, "SavedMessagesDebug", value);
+        }
+
+        private bool? _deleteFilesDebug;
+        public bool DeleteFilesDebug
+        {
+            get => _deleteFilesDebug ??= GetValueOrDefault("DeleteFilesDebug", Constants.DEBUG);
+            set => AddOrUpdateValue(ref _deleteFilesDebug, "DeleteFilesDebug", value);
+        }
+
+        private bool? _mediaServerDebug;
+        public bool MediaServerDebug
+        {
+            get => _mediaServerDebug ??= GetValueOrDefault("MediaServerDebug", true);
+            set => AddOrUpdateValue(ref _mediaServerDebug, "MediaServerDebug", value);
+        }
+
+        private bool? _albumPreloadDebug;
+        public bool AlbumPreloadDebug
+        {
+            get => _albumPreloadDebug ??= GetValueOrDefault("AlbumPreloadDebug", ApiInfo.IsPackagedRelease);
+            set => AddOrUpdateValue(ref _albumPreloadDebug, "AlbumPreloadDebug", value);
+        }
+
+        private bool? _videoPreloadDebug;
+        public bool VideoPreloadDebug
+        {
+            get => _videoPreloadDebug ??= GetValueOrDefault("VideoPreloadDebug", ApiInfo.IsPackagedRelease);
+            set => AddOrUpdateValue(ref _videoPreloadDebug, "VideoPreloadDebug", value);
         }
 
         public bool IsLastErrorDiskFull { get; set; }

@@ -1,7 +1,14 @@
-﻿using LibVLCSharp.Platforms.Windows;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using LibVLCSharp.Platforms.Windows;
 using LibVLCSharp.Shared;
 using System;
 using Telegram.Common;
+using Telegram.Services;
 using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Gallery;
@@ -15,6 +22,7 @@ namespace Telegram.Controls
         private GalleryMedia _video;
 
         private long _bufferedToken;
+        private long _httpServerToken;
 
         private long _initialPosition;
 
@@ -58,6 +66,7 @@ namespace Telegram.Controls
                 _core = null;
             }
 
+            MediaHttpServer.Stop(ref _httpServerToken);
             UpdateManager.Unsubscribe(this, ref _bufferedToken);
         }
 
@@ -74,12 +83,20 @@ namespace Telegram.Controls
             if (_core == null)
             {
                 _video = video;
-                _initialPosition = (long)position;
+                _initialPosition = (long)(position * 1000);
             }
             else
             {
-                _core.Play(new RemoteFileStream(video.ClientService, video.File));
-                _core.Time = (long)position;
+                if (SettingsService.Current.Diagnostics.MediaServerDebug)
+                {
+                    _core.Play(MediaHttpServer.Start(video, ref _httpServerToken));
+                }
+                else
+                {
+                    _core.Play(new RemoteFileStream(video.ClientService, video.File));
+                }
+
+                _core.Time = (long)(position * 1000);
             }
 
             UpdateManager.Subscribe(this, video.ClientService, video.File, ref _bufferedToken, UpdateBuffered);
@@ -88,7 +105,7 @@ namespace Telegram.Controls
         private void UpdateBuffered(object target, File update)
         {
             var offset = update.Local.DownloadOffset + update.Local.DownloadedPrefixSize;
-            OnBufferedChanged(_buffered = update.Local.IsDownloadingCompleted || offset == update.Size ? 0 : offset / update.Size);
+            OnBufferedChanged(_buffered = update.Local.IsDownloadingCompleted || offset == update.Size ? 0 : (double)offset / update.Size);
         }
 
         public override void Play()
@@ -147,7 +164,7 @@ namespace Telegram.Controls
 
         public override void AddTime(double value)
         {
-            _core?.AddTime((long)value);
+            _core?.AddTime((long)value * 1000);
         }
 
         public override double Position
@@ -217,7 +234,7 @@ namespace Telegram.Controls
 
         private void OnInitialized(object sender, InitializedEventArgs e)
         {
-            _core = new AsyncMediaPlayer(e.SwapChainOptions);
+            _core = new AsyncMediaPlayer(false, e.SwapChainOptions);
             _core.Vout += OnVout;
             _core.Stopped += OnStopped;
             _core.TimeChanged += OnTimeChanged;
@@ -230,7 +247,15 @@ namespace Telegram.Controls
 
             if (_video != null)
             {
-                _core.Play(new RemoteFileStream(_video.ClientService, _video.File));
+                if (SettingsService.Current.Diagnostics.MediaServerDebug)
+                {
+                    _core.Play(MediaHttpServer.Start(_video, ref _httpServerToken));
+                }
+                else
+                {
+                    _core.Play(new RemoteFileStream(_video.ClientService, _video.File));
+                }
+
                 _core.Time = _initialPosition;
             }
 

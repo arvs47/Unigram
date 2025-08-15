@@ -51,7 +51,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
     <OutputPath>bin\x64\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NETFX_CORE;WINDOWS_UWP;ENABLE_CALLS;CODE_ANALYSIS</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;NETFX_CORE;WINDOWS_UWP;ENABLE_CALLS;CODE_ANALYSIS;CODE_ANALYSIS;TD_CX</DefineConstants>
     <NoWarn>;2008</NoWarn>
     <DebugType>full</DebugType>
     <PlatformTarget>x64</PlatformTarget>
@@ -63,7 +63,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|ARM64'">
     <DebugSymbols>true</DebugSymbols>
     <OutputPath>bin\ARM64\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;ENABLE_CALLS</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;ENABLE_CALLS;CODE_ANALYSIS;TD_CX</DefineConstants>
     <NoWarn>;2008</NoWarn>
     <DebugType>full</DebugType>
     <PlatformTarget>ARM64</PlatformTarget>
@@ -89,7 +89,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|ARM64'">
     <OutputPath>bin\ARM64\Release\</OutputPath>
-    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;ENABLE_CALLS</DefineConstants>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;ENABLE_CALLS;CODE_ANALYSIS;TD_CX</DefineConstants>
     <Optimize>true</Optimize>
     <NoWarn>;2008</NoWarn>
     <DebugType>pdbonly</DebugType>
@@ -102,7 +102,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
-    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;ENABLE_CALLS</DefineConstants>
+    <DefineConstants>TRACE;NETFX_CORE;WINDOWS_UWP;CODE_ANALYSIS;ENABLE_CALLS;CODE_ANALYSIS;TD_CX</DefineConstants>
     <Optimize>true</Optimize>
     <NoWarn>;2008</NoWarn>
     <DebugType>pdbonly</DebugType>
@@ -128,6 +128,7 @@
     <Compile Include="Assets\Icons\Appearance.cs" />
     <Compile Include="Assets\Icons\AskQ.cs" />
     <Compile Include="Assets\Icons\Business.cs" />
+    <Compile Include="Assets\Icons\ChecklistSelect.cs" />
     <Compile Include="Assets\Icons\Data.cs" />
     <Compile Include="Assets\Icons\Devices.cs" />
     <Compile Include="Assets\Icons\Dots.cs" />
@@ -195,15 +196,26 @@
     <Compile Include="Charts\FastOutSlowInInterpolator.cs" />
     <Compile Include="Charts\LinearChartView.cs" />
     <Compile Include="Charts\LookupTableInterpolator.cs" />
+    <Compile Include="Collections\Experimental\MediaDataSource.cs" />
+    <Compile Include="Collections\Experimental\ItemCacheManager.cs" />
+    <Compile Include="Collections\Experimental\ItemIndexRangeExtensions.cs" />
+    <Compile Include="Collections\Experimental\ItemIndexRangeList.cs" />
+    <Compile Include="Collections\ListWithTotalCount.cs" />
     <Compile Include="Collections\SearchEmojiCollection.cs" />
     <Compile Include="Collections\SynchronizedList.cs" />
+    <Compile Include="Common\AsyncMediaPlayerSwapChain.cs" />
     <Compile Include="Common\AutomaticDragHelper.cs" />
     <Compile Include="Common\BezierPoint.cs" />
+    <Compile Include="Common\DebouncedPropertyWithToken.cs" />
     <Compile Include="Common\FeatureTokenGenerator.cs" />
+    <Compile Include="Common\HttpServer.cs" />
     <Compile Include="Common\MediaDeviceTracker.cs" />
     <Compile Include="Common\MediaDeviceList.cs" />
     <Compile Include="Common\MediaDevicePermissions.cs" />
+    <Compile Include="Common\MediaHttpServer.cs" />
     <Compile Include="Common\SliderHelper.cs" />
+    <Compile Include="Common\VideoPreloader.cs" />
+    <Compile Include="Composition\CompositionVisualColorSource.cs" />
     <Compile Include="Composition\WeakInteractionTrackerOwner.cs" />
     <Compile Include="Controls\Calls\MediaStateBadge.xaml.cs">
       <DependentUpon>MediaStateBadge.xaml</DependentUpon>
@@ -277,11 +289,15 @@
     <Compile Include="Controls\Cells\PremiumGiftCell.xaml.cs">
       <DependentUpon>PremiumGiftCell.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\ChatFoldersNavView.cs" />
     <Compile Include="Controls\Chats\ChatAccountInfo.xaml.cs">
       <DependentUpon>ChatAccountInfo.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\Chats\ChatAccountInfoHeader.xaml.cs">
       <DependentUpon>ChatAccountInfoHeader.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\Chats\ChatPinnedMessage.xaml.cs">
+      <DependentUpon>ChatPinnedMessage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\Chats\ChatSponsoredHeader.xaml.cs">
       <DependentUpon>ChatSponsoredHeader.xaml</DependentUpon>
@@ -289,11 +305,17 @@
     <Compile Include="Controls\Chats\ChatConnectedBotHeader.xaml.cs">
       <DependentUpon>ChatConnectedBotHeader.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\Drawers\EmojiSkinFlyout.xaml.cs">
+      <DependentUpon>EmojiSkinFlyout.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Controls\Drawers\EffectDrawer.xaml.cs">
       <DependentUpon>EffectDrawer.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\Chats\ChatTextFlyout.xaml.cs">
       <DependentUpon>ChatTextFlyout.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\Gallery\GallerySponsoredContent.xaml.cs">
+      <DependentUpon>GallerySponsoredContent.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\Gallery\GalleryCompactOverlay.xaml.cs">
       <DependentUpon>GalleryCompactOverlay.xaml</DependentUpon>
@@ -304,6 +326,9 @@
     <Compile Include="Controls\Messages\Content\PaidMediaContent.xaml.cs">
       <DependentUpon>PaidMediaContent.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\Messages\Content\ChecklistContent.xaml.cs">
+      <DependentUpon>ChecklistContent.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Controls\Messages\Content\PreviewContent.xaml.cs">
       <DependentUpon>PreviewContent.xaml</DependentUpon>
     </Compile>
@@ -313,6 +338,9 @@
     <Compile Include="Controls\Messages\Content\StickerSetContent.xaml.cs">
       <DependentUpon>StickerSetContent.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Td\Api\InlineKeyboardButtonTypeSuggestionApprove.cs" />
+    <Compile Include="Td\Api\InlineKeyboardButtonTypeSuggestionDecline.cs" />
+    <Compile Include="Td\Api\InlineKeyboardButtonTypeSuggestionEdit.cs" />
     <Compile Include="Controls\Messages\MessageEffectMenuFlyout.xaml.cs">
       <DependentUpon>MessageEffectMenuFlyout.xaml</DependentUpon>
     </Compile>
@@ -322,13 +350,29 @@
     <Compile Include="Controls\Messages\MessageFactCheck.xaml.cs">
       <DependentUpon>MessageFactCheck.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\Messages\ReplyMarkupInlinePanel.cs" />
+    <Compile Include="Controls\Messages\Service\SuggestedPostInfoCell.xaml.cs">
+      <DependentUpon>SuggestedPostInfoCell.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Controls\NativeVideoPlayer.xaml.cs">
       <DependentUpon>NativeVideoPlayer.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\PatternBackground.xaml.cs">
       <DependentUpon>PatternBackground.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\Messages\Content\ChecklistTaskContent.xaml.cs">
+      <DependentUpon>ChecklistTaskContent.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\PlaybackOverlay.xaml.cs">
+      <DependentUpon>PlaybackOverlay.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Controls\PremiumStarHeader.cs" />
+    <Compile Include="Controls\ProfileGiftsCover.xaml.cs">
+      <DependentUpon>ProfileGiftsCover.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\ProfileRating.cs" />
+    <Compile Include="Controls\ProfilePatternCover.cs" />
+    <Compile Include="Common\RectangleF.cs" />
     <Compile Include="Controls\SlideTextBlock.cs" />
     <Compile Include="Controls\TableView.cs" />
     <Compile Include="Controls\FrozenAccountCard.xaml.cs">
@@ -338,12 +382,17 @@
     <Compile Include="Controls\Views\ForumView.xaml.cs">
       <DependentUpon>ForumView.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Controls\Views\SendMessagesView.xaml.cs">
+      <DependentUpon>SendMessagesView.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Controls\WebVideoPlayer.xaml.cs">
       <DependentUpon>WebVideoPlayer.xaml</DependentUpon>
     </Compile>
     <Compile Include="CsWinRT.cs" />
     <Compile Include="Entities\StorageAlbum.cs" />
+    <Compile Include="Entities\VideoGeneration.cs" />
     <Compile Include="Services\Calls\VoipCallBase.cs" />
+    <Compile Include="Services\Calls\VoipCoordinator.cs" />
     <Compile Include="Services\Calls\VoipGroupCallVerificationStateChangedEventArgs.cs" />
     <Compile Include="Services\Calls\VoipGroupCallJoinedStateChangedEventArgs.cs" />
     <Compile Include="Services\Calls\VoipGroupCallParticipants.cs" />
@@ -361,6 +410,8 @@
     <Compile Include="Services\ClientService.FeedbackChatTopics.cs" />
     <Compile Include="Services\ClientService.ForumTopics.cs" />
     <Compile Include="Services\FeedbackChatTopicService.cs" />
+    <Compile Include="Services\Settings\VideoSettings.cs" />
+    <Compile Include="Td\Api\MessageAlbumLastMessage.cs" />
     <Compile Include="Services\PaidReactionService.cs" />
     <Compile Include="Controls\Messages\ReactionAsPaidButton.cs" />
     <Compile Include="Controls\Messages\ReactionAsTagButton.cs" />
@@ -372,6 +423,8 @@
     <Compile Include="Services\Calls\VoipGroupCallNetworkStateChangedEventArgs.cs" />
     <Compile Include="Services\ForumTopicService.cs" />
     <Compile Include="Td\Api\ErrorStarsNeeded.cs" />
+    <Compile Include="Td\Api\InputMessageReplyToTopicMessage.cs" />
+    <Compile Include="Td\Api\MessageHeaderAccountInfo.cs" />
     <Compile Include="Td\Api\MessageHeaderMessageTopic.cs" />
     <Compile Include="Td\Api\PremiumLimitTypeFileSize.cs" />
     <Compile Include="Td\Api\ReactionTypeEqualityComparer.cs" />
@@ -591,16 +644,21 @@
     <Compile Include="ViewModels\ComposeViewModel.cs" />
     <Compile Include="ViewModels\Delegates\IBusinessChatLinksDelegate.cs" />
     <Compile Include="ViewModels\Delegates\IBusinessRepliesDelegate.cs" />
-    <Compile Include="ViewModels\Delegates\IFeedbackTopicDelegate.cs" />
+    <Compile Include="ViewModels\Delegates\IDirectMessagesTopicDelegate.cs" />
     <Compile Include="ViewModels\Delegates\IReactionsDelegate.cs" />
     <Compile Include="ViewModels\Delegates\ISavedMessagesChatsDelegate.cs" />
     <Compile Include="ViewModels\Delegates\ITopicListDelegate.cs" />
     <Compile Include="ViewModels\DialogBusinessRepliesViewModel.cs" />
+    <Compile Include="ViewModels\Dialogs\DialogPinnedMessagesViewModel.cs" />
+    <Compile Include="ViewModels\Dialogs\DialogUnreadMessagesViewModel.cs" />
     <Compile Include="ViewModels\DialogViewModel.Translate.cs" />
     <Compile Include="Td\Api\MessageTranslateResult.cs" />
     <Compile Include="ViewModels\Drawers\EffectDrawerViewModel.cs" />
     <Compile Include="Collections\BatchedObservableCollection.cs" />
     <Compile Include="ViewModels\Delegates\IForumTopicDelegate.cs" />
+    <Compile Include="ViewModels\Dialogs\MessageCollection.cs" />
+    <Compile Include="ViewModels\Dialogs\MessageComposerHeader.cs" />
+    <Compile Include="ViewModels\Profile\MediaTabsViewModelBase.cs" />
     <Compile Include="ViewModels\Profile\ProfileBotsTabViewModel.cs" />
     <Compile Include="ViewModels\Profile\ProfileGiftsTabViewModel.cs" />
     <Compile Include="ViewModels\RevenueViewModel.cs" />
@@ -619,7 +677,6 @@
     <Compile Include="Collections\KeyedList.cs" />
     <Compile Include="Collections\MvxObservableCollection.cs" />
     <Compile Include="Collections\SearchChatMessagesCollection.cs" />
-    <Compile Include="Collections\SearchChatsCollection.cs" />
     <Compile Include="Collections\SearchCollection.cs" />
     <Compile Include="Collections\SearchMembersAndUsersCollection.cs" />
     <Compile Include="Collections\SearchStickersCollection.cs" />
@@ -873,9 +930,6 @@
     <Compile Include="Controls\Messages\MessageFooter.xaml.cs">
       <DependentUpon>MessageFooter.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Controls\Messages\MessagePinned.xaml.cs">
-      <DependentUpon>MessagePinned.xaml</DependentUpon>
-    </Compile>
     <Compile Include="Controls\Messages\MessageReferenceBase.cs" />
     <Compile Include="Controls\Messages\MessageSelector.xaml.cs">
       <DependentUpon>MessageSelector.xaml</DependentUpon>
@@ -943,8 +997,8 @@
     </Compile>
     <Compile Include="Controls\PlaybackNextButton.cs" />
     <Compile Include="Controls\PlaybackSlider.cs" />
-    <Compile Include="Controls\PollOptionControl.xaml.cs">
-      <DependentUpon>PollOptionControl.xaml</DependentUpon>
+    <Compile Include="Controls\Messages\Content\PollOptionContent.xaml.cs">
+      <DependentUpon>PollOptionContent.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\PrefixTextBox.cs" />
     <Compile Include="Controls\PremiumLock.cs" />
@@ -1030,7 +1084,7 @@
     <Compile Include="ViewModels\Stories\StoryListViewModel.cs" />
     <Compile Include="ViewModels\Stories\StoryViewModel.cs" />
     <Compile Include="ViewModels\Stories\StoryInteractionsViewModel.cs" />
-    <Compile Include="ViewModels\Supergroups\SupergroupFeedbackGroupViewModel.cs" />
+    <Compile Include="ViewModels\Supergroups\SupergroupDirectMessagesViewModel.cs" />
     <Compile Include="ViewModels\Supergroups\SupergroupTopicsViewModel.cs" />
     <Compile Include="ViewModels\TopicListViewModel.cs" />
     <Compile Include="ViewModels\ChatListViewModel.cs" />
@@ -1214,6 +1268,12 @@
       <DependentUpon>BackgroundPopup.xaml</DependentUpon>
     </Compile>
     <Compile Include="Services\CaptureSessionService.cs" />
+    <Compile Include="Views\Popups\ChooseDateTimePopup.xaml.cs">
+      <DependentUpon>ChooseDateTimePopup.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Popups\CreateChecklistPopup.xaml.cs">
+      <DependentUpon>CreateChecklistPopup.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Popups\FrozenPopup.xaml.cs">
       <DependentUpon>FrozenPopup.xaml</DependentUpon>
     </Compile>
@@ -1254,6 +1314,12 @@
     <Compile Include="Views\Popups\FactCheckPopup.xaml.cs">
       <DependentUpon>FactCheckPopup.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Views\Popups\SuggestPostPopup.xaml.cs">
+      <DependentUpon>SuggestPostPopup.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Popups\QrCodePopup.xaml.cs">
+      <DependentUpon>QrCodePopup.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Popups\JoinGroupCallPopup.xaml.cs">
       <DependentUpon>JoinGroupCallPopup.xaml</DependentUpon>
     </Compile>
@@ -1292,6 +1358,9 @@
     </Compile>
     <Compile Include="Views\Premium\Popups\ChangePrivacyPopup.xaml.cs">
       <DependentUpon>ChangePrivacyPopup.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Views\Profile\ProfileSavedMessagesTabPage.xaml.cs">
+      <DependentUpon>ProfileSavedMessagesTabPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\Profile\ProfileBotsTabPage.xaml.cs">
       <DependentUpon>ProfileBotsTabPage.xaml</DependentUpon>
@@ -1443,12 +1512,14 @@
     <Compile Include="Views\Stars\StarsPage.xaml.cs">
       <DependentUpon>StarsPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Views\Supergroups\SupergroupFeedbackGroupPage.xaml.cs">
-      <DependentUpon>SupergroupFeedbackGroupPage.xaml</DependentUpon>
+    <Compile Include="Views\Supergroups\SupergroupDirectMessagesPage.xaml.cs">
+      <DependentUpon>SupergroupDirectMessagesPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\Supergroups\SupergroupTopicsPage.xaml.cs">
       <DependentUpon>SupergroupTopicsPage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Entities\NavigateToHistoryEntryParameters.cs" />
+    <Compile Include="Entities\NavigationHistory.cs" />
     <Compile Include="Views\Tabbed\WebBrowserPage.xaml.cs">
       <DependentUpon>WebBrowserPage.xaml</DependentUpon>
     </Compile>
@@ -1475,7 +1546,7 @@
     <Compile Include="Td\Api\ErrorType.cs" />
     <Compile Include="Entities\StorageDocument.cs" />
     <Compile Include="Entities\StorageMedia.cs" />
-    <Compile Include="Entities\BitmapEditState.cs" />
+    <Compile Include="Entities\ImageGeneration.cs" />
     <Compile Include="Entities\StoragePhoto.cs" />
     <Compile Include="Entities\StorageVideo.cs" />
     <Compile Include="Logger.cs" />
@@ -2144,7 +2215,11 @@
     <Content Include="Assets\Animations\SupergroupTopics.tgs" />
     <Content Include="Assets\Animations\SupergroupTopicsList.tgs" />
     <Content Include="Assets\Animations\SupergroupTopicsTabs.tgs" />
-    <Content Include="Assets\Animations\SupergroupFeedbackGroup.tgs" />
+    <Content Include="Assets\Animations\SupergroupDirectMessages.tgs" />
+    <Content Include="Assets\Animations\SendMessagesCompleted.tgs" />
+    <Content Include="Assets\Animations\SendMessagesProgress.tgs" />
+    <Content Include="Assets\Fonts\Nunito.ttf" />
+    <Content Include="Assets\Animations\QrLogo.json" />
     <None Include="Assets\i420.hlsl" />
     <Content Include="Assets\Images\Reply.scale-100.png" />
     <Content Include="Assets\Images\Reply.scale-125.png" />
@@ -2590,6 +2665,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="Controls\Chats\ChatPinnedMessage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Controls\Chats\ChatSponsoredHeader.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -2646,6 +2725,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="Controls\Drawers\EmojiSkinFlyout.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Controls\Drawers\EmojiDrawer.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -2665,6 +2748,10 @@
     <Page Include="Controls\FormattedTextFlyout.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\Gallery\GallerySponsoredContent.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <Page Include="Controls\Gallery\GalleryCompactOverlay.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -2695,6 +2782,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Controls\Messages\Content\PaidMediaContent.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Controls\Messages\Content\ChecklistContent.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -2830,11 +2921,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="Controls\Messages\MessagePinned.xaml">
+    <Page Include="Controls\Messages\MessageSelector.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Controls\Messages\MessageSelector.xaml">
+    <Page Include="Controls\Messages\Service\SuggestedPostInfoCell.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -2850,9 +2941,21 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Controls\PollOptionControl.xaml">
+    <Page Include="Controls\Messages\Content\ChecklistTaskContent.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Controls\Messages\Content\PollOptionContent.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Controls\PlaybackOverlay.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\ProfileGiftsCover.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Controls\ProfileHeader.xaml">
       <SubType>Designer</SubType>
@@ -2919,6 +3022,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="Controls\ProfileColorBadge.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\Views\SendMessagesView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -3162,6 +3269,14 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="Views\Popups\ChooseDateTimePopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Popups\CreateChecklistPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Views\Popups\FrozenPopup.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -3214,6 +3329,14 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="Views\Popups\SuggestPostPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Popups\QrCodePopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Views\Popups\JoinGroupCallPopup.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -3263,6 +3386,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="Views\Premium\Popups\ChangePrivacyPopup.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\Profile\ProfileSavedMessagesTabPage.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -3466,7 +3593,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="Views\Supergroups\SupergroupFeedbackGroupPage.xaml">
+    <Page Include="Views\Supergroups\SupergroupDirectMessagesPage.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
@@ -3986,7 +4113,7 @@
       <Version>2.8.7</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.Web.WebView2">
-      <Version>1.0.3240.44</Version>
+      <Version>1.0.3351.48</Version>
     </PackageReference>
     <PackageReference Include="Newtonsoft.Json">
       <Version>13.0.3</Version>
@@ -4009,20 +4136,20 @@
       <Version>4.6.1</Version>
     </PackageReference>
     <PackageReference Include="Telegram.Td.UWP">
-      <Version>1.8.50</Version>
+      <Version>1.8.52</Version>
     </PackageReference>
     <PackageReference Include="VideoLAN.LibVLC.UWP">
       <Version>3.0.21</Version>
     </PackageReference>
     <PackageReference Include="Win2D.uwp">
-      <Version>1.28.2</Version>
+      <Version>1.28.3</Version>
     </PackageReference>
     <!-- Used by AppCenter -->
     <PackageReference Include="SQLitePCLRaw.bundle_winsqlite3">
       <Version>2.1.11</Version>
     </PackageReference>
     <PackageReference Include="System.Reflection.Metadata">
-      <Version>9.0.5</Version>
+      <Version>9.0.7</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
@@ -4061,6 +4188,7 @@
       <Name>Windows Desktop Extensions for the UWP</Name>
     </SDKReference>
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
   </PropertyGroup>

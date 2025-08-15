@@ -140,8 +140,15 @@ namespace Telegram.Controls
 
         private async void OnTextChanged(string text, string placeholder)
         {
+            var visual1 = ElementComposition.GetElementVisual(_presenter);
+            var visual2 = ElementComposition.GetElementVisual(_placeholder);
+
             if (string.IsNullOrEmpty(text))
             {
+                _placeholder.Visibility = Visibility.Visible;
+
+                visual1.Clip = null;
+                visual2.Clip = null;
                 return;
             }
 
@@ -158,9 +165,6 @@ namespace Telegram.Controls
             var fadeIn = BootStrapper.Current.Compositor.CreateScalarKeyFrameAnimation();
             fadeIn.InsertKeyFrame(0, 0);
             fadeIn.InsertKeyFrame(1, 1);
-
-            var visual2 = ElementComposition.GetElementVisual(_placeholder);
-            var visual1 = ElementComposition.GetElementVisual(_presenter);
 
             visual1.StartAnimation("Opacity", fadeIn);
 
@@ -185,15 +189,13 @@ namespace Telegram.Controls
             var width = MathF.Max(actualWidth - left, actualHeight - top);
             var diaginal = MathF.Sqrt((width * width) + (width * width));
 
-            var device = ElementComposition.GetSharedDevice();
+            var rect1 = CanvasGeometry.CreateRectangle(null, 0, 0, show ? 0 : actualWidth, show ? 0 : actualHeight);
 
-            var rect1 = CanvasGeometry.CreateRectangle(device, 0, 0, show ? 0 : actualWidth, show ? 0 : actualHeight);
+            var elli1 = CanvasGeometry.CreateCircle(null, left, top, 0);
+            var group1 = CanvasGeometry.CreateGroup(null, new[] { elli1, rect1 }, CanvasFilledRegionDetermination.Alternate);
 
-            var elli1 = CanvasGeometry.CreateCircle(device, left, top, 0);
-            var group1 = CanvasGeometry.CreateGroup(device, new[] { elli1, rect1 }, CanvasFilledRegionDetermination.Alternate);
-
-            var elli2 = CanvasGeometry.CreateCircle(device, left, top, diaginal);
-            var group2 = CanvasGeometry.CreateGroup(device, new[] { elli2, rect1 }, CanvasFilledRegionDetermination.Alternate);
+            var elli2 = CanvasGeometry.CreateCircle(null, left, top, diaginal);
+            var group2 = CanvasGeometry.CreateGroup(null, new[] { elli2, rect1 }, CanvasFilledRegionDetermination.Alternate);
 
             var ellipse = BootStrapper.Current.Compositor.CreatePathGeometry(new CompositionPath(group2));
             var clip = BootStrapper.Current.Compositor.CreateGeometricClip(ellipse);
@@ -270,12 +272,11 @@ namespace Telegram.Controls
                 return finalSize;
             }
 
-            var device = ElementComposition.GetSharedDevice();
             var list = new List<CanvasGeometry>();
 
             var left = (float)Padding.Left;
             var top = (float)Padding.Top;
-            var rects = PlaceholderImageHelper.Current.LineMetrics(PlaceholderText ?? string.Empty, Array.Empty<TextEntity>(), _placeholder.FontSize, _placeholder.DesiredSize.Width - Padding.Left - Padding.Right, IsPlaceholderRightToLeft);
+            var rects = PlaceholderImageHelper.Foreground.LineMetrics(PlaceholderText ?? string.Empty, Array.Empty<TextEntity>(), _placeholder.FontSize, _placeholder.DesiredSize.Width - Padding.Left - Padding.Right, IsPlaceholderRightToLeft);
 
             foreach (var rect in rects)
             {
@@ -284,10 +285,10 @@ namespace Telegram.Controls
                     continue;
                 }
 
-                list.Add(CanvasGeometry.CreateRoundedRectangle(device, new Rect(left + rect.X - 4, top + rect.Y - 2, rect.Width + 6, rect.Height + 6), 4, 4));
+                list.Add(CanvasGeometry.CreateRoundedRectangle(null, new Rect(left + rect.X - 4, top + rect.Y - 2, rect.Width + 6, rect.Height + 6), 4, 4));
             }
 
-            _skeleton.Clip = BootStrapper.Current.Compositor.CreateGeometricClip(BootStrapper.Current.Compositor.CreatePathGeometry(new CompositionPath(CanvasGeometry.CreateGroup(device, list.ToArray(), CanvasFilledRegionDetermination.Winding))));
+            _skeleton.Clip = BootStrapper.Current.Compositor.CreateGeometricClip(BootStrapper.Current.Compositor.CreatePathGeometry(new CompositionPath(CanvasGeometry.CreateGroup(null, list.ToArray(), CanvasFilledRegionDetermination.Winding))));
             _skeleton.Size = _placeholder.DesiredSize.ToVector2();
 
             return finalSize;

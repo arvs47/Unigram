@@ -77,7 +77,7 @@ namespace Telegram.Common
             {
                 for (int i = 0; i < entities.Count; i++)
                 {
-                    if (entities[i].Type is TextEntityTypeUrl)
+                    if (entities[i].Type is TextEntityTypeUrl or TextEntityTypeMention or TextEntityTypeMediaTimestamp)
                     {
                         entities.RemoveAt(i);
                         i--;
@@ -237,6 +237,15 @@ namespace Telegram.Common
                         local = hyperlink;
                     }
                     else if (entity.Type is TextEntityTypeMention mention)
+                    {
+                        var data = text.Substring(entity.Offset + 1, entity.Length - 1);
+                        var hyperlink = new Hyperlink();
+                        hyperlink.Click += (s, args) => Hyperlink_Click(s, entity.Type, data);
+                        hyperlink.UnderlineStyle = UnderlineStyle.None;
+                        span.Inlines.Add(hyperlink);
+                        local = hyperlink;
+                    }
+                    else if (entity.Type is TextEntityTypeMentionName mentionName)
                     {
                         var data = text.Substring(entity.Offset + 1, entity.Length - 1);
                         var hyperlink = new Hyperlink();
@@ -448,6 +457,10 @@ namespace Telegram.Common
             else if (type is TextEntityTypeMention)
             {
                 MessageHelper.NavigateToUsername(clientService, navigationService, data.TrimStart('@'));
+            }
+            else if (type is TextEntityTypeMentionName mentionName)
+            {
+                navigationService.NavigateToUser(mentionName.UserId);
             }
             else if (type is TextEntityTypeUrl)
             {

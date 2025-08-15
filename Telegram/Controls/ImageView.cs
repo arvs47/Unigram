@@ -17,9 +17,10 @@ using Windows.UI.Xaml.Media.Imaging;
 
 namespace Telegram.Controls
 {
-    public partial class ImageView : HyperlinkButton
+    public partial class ImageView : Control
     {
-        protected FrameworkElement Holder;
+        protected Border RootGrid;
+        protected FrameworkElement Presenter;
 
         public ImageView()
         {
@@ -28,10 +29,11 @@ namespace Telegram.Controls
 
         protected override void OnApplyTemplate()
         {
-            Holder = (FrameworkElement)GetTemplateChild("Holder");
-            Holder.Loaded += Holder_Loaded;
+            RootGrid = (Border)GetTemplateChild(nameof(RootGrid));
+            Presenter = (FrameworkElement)GetTemplateChild(nameof(Presenter));
+            Presenter.Loaded += Holder_Loaded;
 
-            if (Holder is Image image)
+            if (Presenter is Image image)
             {
                 image.ImageFailed += Holder_ImageFailed;
                 image.ImageOpened += Holder_ImageOpened;
@@ -372,26 +374,51 @@ namespace Telegram.Controls
 
         public event RoutedEventHandler ImageOpened;
 
+        public void Clear()
+        {
+            _clientService = null;
+            _file = null;
+            _width = 0;
+            _height = 0;
+            _blurRadius = 0;
+
+            Source = null;
+            UpdateManager.Unsubscribe(this, ref _fileToken, true);
+        }
+
         #region Bitmap
 
         private IClientService _clientService;
         private File _file;
         private int _width;
         private int _height;
+        private int _blurRadius;
 
         private long _fileToken;
 
-        public void SetSource(IClientService clientService, File file, int width = 0, int height = 0)
+        public void SetSource(IClientService clientService, File file, int width = 0, int height = 0, int blurRadius = 0)
         {
             _clientService = clientService;
             _file = file;
             _width = width;
             _height = height;
+            _blurRadius = blurRadius;
 
-            Source = GetSource(clientService, file, width, height, true);
+            Source = GetSource(clientService, file, null, width, height, blurRadius, true);
         }
 
-        private ImageSource GetSource(IClientService clientService, File file, int width, int height, bool download)
+        public void SetSource(IClientService clientService, File file, Minithumbnail minithumbnail, int width = 0, int height = 0, int blurRadius = 0)
+        {
+            _clientService = clientService;
+            _file = file;
+            _width = width;
+            _height = height;
+            _blurRadius = blurRadius;
+
+            Source = GetSource(clientService, file, minithumbnail, width, height, blurRadius, true);
+        }
+
+        private ImageSource GetSource(IClientService clientService, File file, Minithumbnail minithumbnail, int width, int height, int blurRadius, bool download)
         {
             if (file == null)
             {
@@ -399,6 +426,13 @@ namespace Telegram.Controls
             }
             else if (file.Local.IsDownloadingCompleted)
             {
+                if (blurRadius > 0)
+                {
+                    var source = new BitmapImage();
+                    PlaceholderHelper.GetBlurred(source, file.Local.Path, blurRadius);
+                    return source;
+                }
+
                 return UriEx.ToBitmap(file.Local.Path, width, height);
             }
             else if (download)
@@ -409,6 +443,13 @@ namespace Telegram.Controls
                 {
                     clientService.DownloadFile(file.Id, 16);
                 }
+
+                if (minithumbnail != null)
+                {
+                    var source = new BitmapImage();
+                    PlaceholderHelper.GetBlurred(source, minithumbnail.Data, 3);
+                    return source;
+                }
             }
 
             return null;
@@ -416,7 +457,34 @@ namespace Telegram.Controls
 
         private void UpdateSource(object target, File file)
         {
-            Source = GetSource(_clientService, _file, _width, _height, false);
+            Source = GetSource(_clientService, _file, null, _width, _height, _blurRadius, false);
+        }
+
+        #endregion
+
+        #region Location
+
+        private double _latitude;
+        private double _longitude;
+
+        public async void SetSource(IClientService clientService, Location location, int width, int height, long chatId)
+        {
+            if (_latitude == location.Latitude && _longitude == location.Longitude)
+            {
+                return;
+            }
+
+            _latitude = location.Latitude;
+            _longitude = location.Longitude;
+
+            var scaledWidth = (int)(width * XamlRoot.RasterizationScale);
+            var scaledHeight = (int)(height * XamlRoot.RasterizationScale);
+
+            var response = await clientService.SendAsync(new GetMapThumbnailFile(location, 15, scaledWidth, scaledHeight, 1, chatId));
+            if (response is File file && _latitude == location.Latitude && _longitude == location.Longitude)
+            {
+                SetSource(clientService, file, width, height);
+            }
         }
 
         #endregion

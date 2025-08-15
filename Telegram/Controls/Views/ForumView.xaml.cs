@@ -10,7 +10,6 @@ using System.Linq;
 using Telegram.Common;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
-using Telegram.Navigation;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Telegram.ViewModels.Delegates;
@@ -21,8 +20,6 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Input;
-using Windows.UI.Xaml.Media;
-using VirtualKey = Windows.System.VirtualKey;
 
 namespace Telegram.Controls.Views
 {
@@ -33,7 +30,7 @@ namespace Telegram.Controls.Views
         Horizontal
     }
 
-    public sealed partial class ForumView : UserControl, ITopicListDelegate
+    public sealed partial class ForumView : UserControl, ITopicListDelegate, IAutomationNameProvider
     {
         public TopicListViewModel ViewModel
         {
@@ -77,10 +74,8 @@ namespace Telegram.Controls.Views
             {
                 ScrollingHost.Margin = new Thickness(0, 40, 0, 0);
 
-                // TODO: theming
-                BackgroundRoot.Background = BootStrapper.Current.Resources["PageSubHeaderBackgroundBrush2"] as Brush;
-                BackgroundRoot.CornerRadius = new CornerRadius(0);
-                BackgroundRoot.BorderThickness = new Thickness(0, 0, 1, 0);
+                BackgroundRoot.Visibility = Visibility.Collapsed;
+                VerticalBackgroundRoot.Visibility = Visibility.Visible;
                 Header.Visibility = Visibility.Collapsed;
 
                 Width = 72;
@@ -248,9 +243,9 @@ namespace Telegram.Controls.Views
         private void OnContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
         {
             var forumTopic = args.Item as ForumTopic;
-            var feedbackChatTopic = args.Item as FeedbackChatTopic;
+            var directMessagesChatTopic = args.Item as DirectMessagesChatTopic;
 
-            var topicId = forumTopic?.Info.MessageThreadId ?? feedbackChatTopic.Id;
+            var topicId = forumTopic?.Info.MessageThreadId ?? directMessagesChatTopic.Id;
 
             if (args.InRecycleQueue)
             {
@@ -269,9 +264,9 @@ namespace Telegram.Controls.Views
             {
                 forumTopicCell.UpdateForumTopic(ViewModel, forumTopic);
             }
-            else if (feedbackChatTopic != null && args.ItemContainer.ContentTemplateRoot is IFeedbackTopicDelegate feedbackTopicCell)
+            else if (directMessagesChatTopic != null && args.ItemContainer.ContentTemplateRoot is IDirectMessagesTopicDelegate feedbackTopicCell)
             {
-                feedbackTopicCell.UpdateFeedbackChatTopic(ViewModel, feedbackChatTopic);
+                feedbackTopicCell.UpdateDirectMessagesChatTopic(ViewModel, directMessagesChatTopic);
             }
 
             args.Handled = true;
@@ -296,12 +291,12 @@ namespace Telegram.Controls.Views
             return false;
         }
 
-        private bool TryGetTopicAndCell(long topicId, out FeedbackChatTopic topic, out IFeedbackTopicDelegate cell)
+        private bool TryGetTopicAndCell(long topicId, out DirectMessagesChatTopic topic, out IDirectMessagesTopicDelegate cell)
         {
             if (_itemToSelector.TryGetValue(topicId, out SelectorItem container))
             {
-                topic = ScrollingHost.ItemFromContainer(container) as FeedbackChatTopic;
-                cell = container.ContentTemplateRoot as IFeedbackTopicDelegate;
+                topic = ScrollingHost.ItemFromContainer(container) as DirectMessagesChatTopic;
+                cell = container.ContentTemplateRoot as IDirectMessagesTopicDelegate;
                 return topic != null && cell != null;
             }
 
@@ -322,11 +317,11 @@ namespace Telegram.Controls.Views
             return false;
         }
 
-        private bool TryGetCell(FeedbackChatTopic topic, out IFeedbackTopicDelegate cell)
+        private bool TryGetCell(DirectMessagesChatTopic topic, out IDirectMessagesTopicDelegate cell)
         {
             if (_itemToSelector.TryGetValue(topic.Id, out SelectorItem container))
             {
-                cell = container.ContentTemplateRoot as IFeedbackTopicDelegate;
+                cell = container.ContentTemplateRoot as IDirectMessagesTopicDelegate;
                 return cell != null;
             }
 
@@ -363,28 +358,28 @@ namespace Telegram.Controls.Views
 
         #endregion
 
-        #region FeedbackChatTopic
+        #region DirectMessagesChatTopic
 
-        public void UpdateFeedbackChatTopicLastMessage(FeedbackChatTopic topic)
+        public void UpdateDirectMessagesChatTopicLastMessage(DirectMessagesChatTopic topic)
         {
-            HandleFeedbackChatTopic(topic, (chatView, chat) =>
+            HandleDirectMessagesChatTopic(topic, (chatView, chat) =>
             {
-                chatView.UpdateFeedbackChatTopicReadInbox(chat);
-                chatView.UpdateFeedbackChatTopicLastMessage(chat);
+                chatView.UpdateDirectMessagesChatTopicReadInbox(chat);
+                chatView.UpdateDirectMessagesChatTopicLastMessage(chat);
             });
         }
 
-        public void HandleFeedbackChatTopic(long topicId, Action<IFeedbackTopicDelegate, FeedbackChatTopic> action)
+        public void HandleDirectMessagesChatTopic(long topicId, Action<IDirectMessagesTopicDelegate, DirectMessagesChatTopic> action)
         {
-            if (TryGetTopicAndCell(topicId, out FeedbackChatTopic chat, out IFeedbackTopicDelegate cell))
+            if (TryGetTopicAndCell(topicId, out DirectMessagesChatTopic chat, out IDirectMessagesTopicDelegate cell))
             {
                 action(cell, chat);
             }
         }
 
-        public void HandleFeedbackChatTopic(FeedbackChatTopic topic, Action<IFeedbackTopicDelegate, FeedbackChatTopic> action)
+        public void HandleDirectMessagesChatTopic(DirectMessagesChatTopic topic, Action<IDirectMessagesTopicDelegate, DirectMessagesChatTopic> action)
         {
-            if (TryGetCell(topic, out IFeedbackTopicDelegate cell))
+            if (TryGetCell(topic, out IDirectMessagesTopicDelegate cell))
             {
                 action(cell, topic);
             }
@@ -396,7 +391,7 @@ namespace Telegram.Controls.Views
         {
             await System.Threading.Tasks.Task.Delay(100);
 
-            if (ViewModel.SelectionMode != ListViewSelectionMode.Multiple)
+            if (ViewModel?.SelectionMode != ListViewSelectionMode.Multiple)
             {
                 try
                 {
@@ -557,9 +552,9 @@ namespace Telegram.Controls.Views
                     flyout.CreateFlyoutItem(viewModel.SelectTopic, forumTopic, Strings.Select, Icons.CheckmarkCircle);
                 }
             }
-            else if (topic is FeedbackChatTopic feedbackChatTopic && ViewModel.Chat.IsFeedbackChatAdministrator(ViewModel.ClientService))
+            else if (topic is DirectMessagesChatTopic directMessagesChatTopic && supergroup.IsAdministeredDirectMessagesGroup)
             {
-                flyout.CreateFlyoutItem(viewModel.ClearTopic, feedbackChatTopic, Strings.ClearHistory, Icons.Broom);
+                flyout.CreateFlyoutItem(viewModel.ClearTopic, directMessagesChatTopic, Strings.ClearHistory, Icons.Broom);
             }
 
             flyout.ShowAt(sender, args);
@@ -591,6 +586,40 @@ namespace Telegram.Controls.Views
             {
                 ScrollingHost.ItemClick -= value;
             }
+        }
+
+        public string GetAutomationName()
+        {
+            if (Title == null || Subtitle == null || ChatActionLabel == null)
+            {
+                return string.Empty;
+            }
+
+            var result = Title.Text.TrimEnd('.', ',');
+            var identity = Identity.CurrentType switch
+            {
+                IdentityIconType.Fake => Strings.FakeMessage,
+                IdentityIconType.Scam => Strings.ScamMessage,
+                IdentityIconType.Premium => Strings.AccDescrPremium,
+                IdentityIconType.Verified => Strings.AccDescrVerified,
+                _ => null
+            };
+
+            if (identity != null)
+            {
+                result += ", " + identity;
+            }
+
+            if (ChatActionLabel.Text.Length > 0)
+            {
+                result += ", " + ChatActionLabel.Text;
+            }
+            else if (Subtitle.Text.Length > 0)
+            {
+                result += ", " + Subtitle.Text;
+            }
+
+            return result;
         }
     }
 }

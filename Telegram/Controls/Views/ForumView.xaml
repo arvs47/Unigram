@@ -150,11 +150,6 @@
                                   Background="Transparent"
                                   VerticalAlignment="Center"
                                   Grid.Column="2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
                                 <Border x:Name="UnreadMentionsBadge"
                                         Background="{ThemeResource ChatUnreadBadgeBrush}"
                                         Width="16"
@@ -163,8 +158,7 @@
                                         VerticalAlignment="Top"
                                         HorizontalAlignment="Right"
                                         Margin="4,2,0,0"
-                                        Visibility="Collapsed"
-                                        Grid.Column="1">
+                                        Visibility="Collapsed">
                                     <TextBlock x:Name="UnreadMentionsLabel"
                                                Text="&#xE986;"
                                                FontSize="12"
@@ -178,8 +172,7 @@
                                                        VerticalAlignment="Top"
                                                        HorizontalAlignment="Right"
                                                        Margin="4,2,0,0"
-                                                       Visibility="Collapsed"
-                                                       Grid.Column="2" />
+                                                       Visibility="Collapsed" />
                             </Grid>
 
                             <Rectangle x:Name="DropVisual"
@@ -206,12 +199,6 @@
         <ItemsPanelTemplate x:Name="HorizontalPanelTemplate">
             <ItemsStackPanel Orientation="Horizontal" />
         </ItemsPanelTemplate>
-
-        <Style x:Name="VerticalBackgroundStyle"
-               TargetType="Border">
-            <Setter Property="Background"
-                    Value="{ThemeResource PageSubHeaderBackgroundBrush2}" />
-        </Style>
 
         <Style x:Name="VerticalListViewItemStyle"
                TargetType="controls:TopNavViewItem">
@@ -359,8 +346,8 @@
                                            Width="3"
                                            Fill="{ThemeResource NavigationViewSelectionIndicatorForeground}"
                                            Opacity="0"
-                                           RadiusX="3"
-                                           RadiusY="3" />
+                                           RadiusX="1.5"
+                                           RadiusY="1.5" />
                             </Grid>
                         </Grid>
                     </ControlTemplate>
@@ -380,6 +367,13 @@
                 CornerRadius="{ThemeResource NavigationViewContentGridCornerRadius}"
                 BorderThickness="{ThemeResource NavigationViewContentGridBorderThickness}"
                 BackgroundSizing="InnerBorderEdge"
+                Grid.RowSpan="2" />
+        <Border x:Name="VerticalBackgroundRoot"
+                Background="{ThemeResource PageSubHeaderBackgroundBrush2}"
+                BorderBrush="{ThemeResource SettingsItemBorderBrush}"
+                BorderThickness="0,0,1,0"
+                BackgroundSizing="InnerBorderEdge"
+                Visibility="Collapsed"
                 Grid.RowSpan="2" />
 
         <Grid x:Name="Header"

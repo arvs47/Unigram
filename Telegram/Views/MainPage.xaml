@@ -91,6 +91,16 @@
                               Fill="#FFFFFF" />
                     </Border>
 
+                    <controls:AnimatedImage x:Name="LogoEmojiParticles"
+                                            IsViewportAware="True"
+                                            FrameSize="24,24"
+                                            DecodeFrameType="Logical"
+                                            Stretch="UniformToFill"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Width="24"
+                                            Height="24" />
+
                     <controls:CustomEmojiIcon x:Name="LogoEmoji"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center" />
@@ -121,37 +131,39 @@
                     BorderThickness="0,0,1,0"
                     Margin="0,-40,0,0" />
 
-            <controls:TopNavView x:Name="ChatFoldersSide"
-                                 AutomationProperties.Name="{CustomResource Filters}"
-                                 ItemsSource="{x:Bind NavigationResults.View}"
-                                 SelectedItem="{x:Bind ViewModel.SelectedFolder, Mode=OneWay}"
-                                 SelectionChanged="ChatFolders_SelectionChanged"
-                                 ItemContextRequested="ChatFolder_ContextRequested"
-                                 ChoosingGroupHeaderContainer="ChatFolders_ChoosingGroupHeaderContainer"
-                                 Orientation="Vertical"
-                                 AllowDrop="True"
-                                 CanDragItems="True"
-                                 CanReorderItems="False"
-                                 DragItemsStarting="ChatFolders_DragItemsStarting"
-                                 DragItemsCompleted="ChatFolders_DragItemsCompleted"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 ScrollViewer.HorizontalScrollMode="Disabled"
-                                 ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                                 ScrollViewer.VerticalScrollMode="Auto"
-                                 Height="Auto"
-                                 Width="72"
-                                 Grid.Row="1">
-                <controls:TopNavView.ItemTemplate>
+            <controls:ChatFoldersNavView x:Name="ChatFoldersSide"
+                                         AutomationProperties.Name="{CustomResource Filters}"
+                                         ItemsSource="{x:Bind NavigationResults.View}"
+                                         SelectedItem="{x:Bind ViewModel.SelectedFolder, Mode=OneWay}"
+                                         SelectionChanged="ChatFolders_SelectionChanged"
+                                         IsItemClickEnabled="True"
+                                         ItemClick="ChatFolders_ItemClick"
+                                         ItemContextRequested="ChatFolder_ContextRequested"
+                                         ChoosingGroupHeaderContainer="ChatFolders_ChoosingGroupHeaderContainer"
+                                         Orientation="Vertical"
+                                         AllowDrop="True"
+                                         CanDragItems="True"
+                                         CanReorderItems="False"
+                                         DragItemsStarting="ChatFolders_DragItemsStarting"
+                                         DragItemsCompleted="ChatFolders_DragItemsCompleted"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         ScrollViewer.HorizontalScrollMode="Disabled"
+                                         ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                                         ScrollViewer.VerticalScrollMode="Auto"
+                                         Height="Auto"
+                                         Width="72"
+                                         Grid.Row="1">
+                <controls:ChatFoldersNavView.ItemTemplate>
                     <DataTemplate>
                         <cells:ChatFolderCell />
                     </DataTemplate>
-                </controls:TopNavView.ItemTemplate>
-                <controls:TopNavView.ItemsPanel>
+                </controls:ChatFoldersNavView.ItemTemplate>
+                <controls:ChatFoldersNavView.ItemsPanel>
                     <ItemsPanelTemplate>
                         <ItemsStackPanel Orientation="Vertical" />
                     </ItemsPanelTemplate>
-                </controls:TopNavView.ItemsPanel>
-                <controls:TopNavView.ItemContainerStyle>
+                </controls:ChatFoldersNavView.ItemsPanel>
+                <controls:ChatFoldersNavView.ItemContainerStyle>
                     <Style TargetType="controls:TopNavViewItem">
                         <Setter Property="HorizontalAlignment"
                                 Value="Stretch" />
@@ -234,16 +246,16 @@
                                                        Height="24"
                                                        Fill="{ThemeResource NavigationViewSelectionIndicatorForeground}"
                                                        Opacity="0"
-                                                       RadiusX="3"
-                                                       RadiusY="3" />
+                                                       RadiusX="1.5"
+                                                       RadiusY="1.5" />
                                         </Grid>
                                     </Grid>
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
                     </Style>
-                </controls:TopNavView.ItemContainerStyle>
-                <controls:TopNavView.GroupStyle>
+                </controls:ChatFoldersNavView.ItemContainerStyle>
+                <controls:ChatFoldersNavView.GroupStyle>
                     <GroupStyle>
                         <GroupStyle.HeaderContainerStyle>
                             <Style TargetType="ListViewHeaderItem">
@@ -263,8 +275,8 @@
                             </Style>
                         </GroupStyle.HeaderContainerStyle>
                     </GroupStyle>
-                </controls:TopNavView.GroupStyle>
-            </controls:TopNavView>
+                </controls:ChatFoldersNavView.GroupStyle>
+            </controls:ChatFoldersNavView>
         </Grid>
 
         <controls:MenuButton x:Name="Photo"
@@ -525,22 +537,30 @@
                                 <Border x:Name="ChatTabs"
                                         x:Load="False">
                                     <Grid x:Name="ChatTabsView">
-                                        <controls:TopNavView x:Name="ChatFolders"
-                                                             AutomationProperties.Name="{CustomResource Filters}"
-                                                             ItemsSource="{x:Bind ViewModel.Folders}"
-                                                             SelectedItem="{x:Bind ViewModel.SelectedFolder, Mode=OneWay}"
-                                                             SelectionChanged="ChatFolders_SelectionChanged"
-                                                             ItemContextRequested="ChatFolder_ContextRequested"
-                                                             AllowDrop="True"
-                                                             CanDragItems="True"
-                                                             CanReorderItems="False"
-                                                             DragItemsStarting="ChatFolders_DragItemsStarting"
-                                                             DragItemsCompleted="ChatFolders_DragItemsCompleted"
-                                                             ScrollViewer.IsHorizontalScrollChainingEnabled="False"
-                                                             FocusFollowsSingleSelection="True"
-                                                             SingleSelectionFollowsFocus="False"
-                                                             Height="40">
-                                            <controls:TopNavView.ItemTemplate>
+                                        <!-- Blurred background
+                                        <Border Margin="0,-72,0,0">
+                                            <Border.Background>
+                                                <media:BlurBrush />
+                                            </Border.Background>
+                                        </Border>-->
+                                        <controls:ChatFoldersNavView x:Name="ChatFolders"
+                                                                     AutomationProperties.Name="{CustomResource Filters}"
+                                                                     ItemsSource="{x:Bind ViewModel.Folders}"
+                                                                     SelectedItem="{x:Bind ViewModel.SelectedFolder, Mode=OneWay}"
+                                                                     IsItemClickEnabled="True"
+                                                                     ItemClick="ChatFolders_ItemClick"
+                                                                     SelectionChanged="ChatFolders_SelectionChanged"
+                                                                     ItemContextRequested="ChatFolder_ContextRequested"
+                                                                     AllowDrop="True"
+                                                                     CanDragItems="True"
+                                                                     CanReorderItems="False"
+                                                                     DragItemsStarting="ChatFolders_DragItemsStarting"
+                                                                     DragItemsCompleted="ChatFolders_DragItemsCompleted"
+                                                                     ScrollViewer.IsHorizontalScrollChainingEnabled="False"
+                                                                     FocusFollowsSingleSelection="True"
+                                                                     SingleSelectionFollowsFocus="False"
+                                                                     Height="40">
+                                            <controls:ChatFoldersNavView.ItemTemplate>
                                                 <DataTemplate x:DataType="viewModels:ChatFolderViewModel">
                                                     <StackPanel Orientation="Horizontal">
                                                         <RichTextBlock cells:ChatFolderCell.Title="{x:Bind Name, Mode=OneWay}"
@@ -557,16 +577,16 @@
                                                                                Margin="4,0,0,0" />
                                                     </StackPanel>
                                                 </DataTemplate>
-                                            </controls:TopNavView.ItemTemplate>
-                                            <controls:TopNavView.ItemContainerTransitions>
+                                            </controls:ChatFoldersNavView.ItemTemplate>
+                                            <controls:ChatFoldersNavView.ItemContainerTransitions>
                                                 <TransitionCollection>
                                                     <AddDeleteThemeTransition />
                                                     <ContentThemeTransition />
                                                     <ReorderThemeTransition />
                                                     <RepositionThemeTransition />
                                                 </TransitionCollection>
-                                            </controls:TopNavView.ItemContainerTransitions>
-                                        </controls:TopNavView>
+                                            </controls:ChatFoldersNavView.ItemContainerTransitions>
+                                        </controls:ChatFoldersNavView>
                                     </Grid>
                                 </Border>
                             </StackPanel>
@@ -600,7 +620,7 @@
                                                        Grid.RowSpan="2">
                                 <ListView.Header>
                                     <StackPanel>
-                                        <Grid>
+                                        <Grid Visibility="{x:Bind UpdateScrollingHostHeaderVisibility(MasterDetail.CurrentState, ViewModel.IsPrimaryFolderSelected), Mode=OneWay}">
                                             <controls:SuggestedActionSetBirthdateCard x:Name="SetBirthdateCard"
                                                                                       x:Load="False"
                                                                                       Click="{x:Bind ViewModel.SetBirthdate}"

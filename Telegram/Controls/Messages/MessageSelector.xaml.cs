@@ -13,6 +13,7 @@ using Telegram.Common;
 using Telegram.Composition;
 using Telegram.Controls.Chats;
 using Telegram.Controls.Messages.Content;
+using Telegram.Controls.Messages.Service;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -32,6 +33,7 @@ namespace Telegram.Controls.Messages
 {
     public sealed partial class MessageSelector : ToggleButtonEx
     {
+        private Border Header;
         private Border Icon;
         private ContentPresenter Presenter;
 
@@ -184,6 +186,8 @@ namespace Telegram.Controls.Messages
             Presenter = GetTemplateChild(nameof(Presenter)) as ContentPresenter;
             ElementCompositionPreview.SetIsTranslationEnabled(Presenter, true);
 
+            Header = GetTemplateChild(nameof(Header)) as Border;
+
             _templateApplied = true;
 
             if (_message?.Delegate != null)
@@ -259,6 +263,28 @@ namespace Telegram.Controls.Messages
             message.UpdateSelectionCallback(UpdateSelection);
 
             UpdateSelectionEnabled(selectionEnabled, false);
+            UpdateMessageSuggestedPostInfo(message);
+        }
+
+        private bool _hasSuggestedPostInfo;
+
+        public void UpdateMessageSuggestedPostInfo(MessageViewModel message)
+        {
+            if (message == null || !_templateApplied)
+            {
+                return;
+            }
+
+            if (message.SuggestedPostInfo != null)
+            {
+                _hasSuggestedPostInfo = true;
+                Header.Child = new SuggestedPostInfoCell(message);
+            }
+            else if (_hasSuggestedPostInfo)
+            {
+                _hasSuggestedPostInfo = false;
+                Header.Child = null;
+            }
         }
 
         private bool _selectionEnabled;
@@ -427,11 +453,11 @@ namespace Telegram.Controls.Messages
             }
 
             properties = compositor.CreatePropertySet();
-            properties.InsertScalar("Progress", 1.0F);
+            properties.InsertScalar("Progress", 0.0F);
 
             var progressAnimation = compositor.CreateExpressionAnimation("_.Progress");
             progressAnimation.SetReferenceParameter("_", properties);
-            visual.RootVisual.Properties.InsertScalar("Progress", 1.0F);
+            visual.RootVisual.Properties.InsertScalar("Progress", 0.0F);
             visual.RootVisual.Properties.StartAnimation("Progress", progressAnimation);
 
             return visual;
@@ -574,7 +600,7 @@ namespace Telegram.Controls.Messages
             }
 
             var share = SettingsService.Current.SwipeToShare && properties.CanBeForwarded;
-            var reply = SettingsService.Current.SwipeToReply && (canReply || properties.CanBeRepliedInAnotherChat);
+            var reply = SettingsService.Current.SwipeToReply && (properties.CanBeReplied || properties.CanBeRepliedInAnotherChat);
 
             if (_tracker != null)
             {

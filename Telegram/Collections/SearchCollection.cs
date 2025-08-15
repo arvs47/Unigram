@@ -7,6 +7,7 @@
 using Rg.DiffUtils;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading;
@@ -17,7 +18,7 @@ using Windows.UI.Xaml.Data;
 
 namespace Telegram.Collections
 {
-    public partial class SearchCollection<T, TSource> : DiffObservableCollection<T>, ISupportIncrementalLoading where TSource : IEnumerable<T>
+    public partial class SearchCollection<T, TSource> : MvxObservableCollection<T>, ISupportIncrementalLoading where TSource : IList<T>, ISupportIncrementalLoading, INotifyCollectionChanged
     {
         private readonly Func<object, string, TSource> _factory;
         private object _sender;
@@ -25,10 +26,10 @@ namespace Telegram.Collections
         private CancellationTokenSource _cancellation;
 
         private TSource _source;
-        private ISupportIncrementalLoading _incrementalSource;
 
         private bool _initialized;
         private bool _loading;
+        private bool _replacing;
 
         public SearchCollection(Func<object, string, TSource> factory, IDiffHandler<T> handler)
             : this(factory, null, handler)
@@ -40,10 +41,10 @@ namespace Telegram.Collections
         {
             _factory = factory;
             _sender = sender;
-            _query = new DebouncedProperty<string>(Constants.TypingTimeout, UpdateQuery);
+            _query = new DebouncedPropertyWithToken<string>(Constants.TypingTimeout, UpdateQuery);
         }
 
-        private readonly DebouncedProperty<string> _query;
+        private readonly DebouncedPropertyWithToken<string> _query;
         public string Query
         {
             get => _query;
@@ -68,8 +69,13 @@ namespace Telegram.Collections
             Update(_factory((_sender = sender) ?? this, _query.Value));
         }
 
-        public void UpdateQuery(string value)
+        public void UpdateQuery(string value, CancellationToken token = default)
         {
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
             Update(_factory(_sender ?? this, _query.Value = value));
         }
 
@@ -87,14 +93,20 @@ namespace Telegram.Collections
 
         private async void UpdateImpl(TSource source, bool reentrancy)
         {
+            if (_source != null)
+            {
+                _source.CollectionChanged -= OnCollectionChanged;
+            }
+
             if (source is ISupportIncrementalLoading incremental && incremental.HasMoreItems)
             {
                 _source = source;
-                _incrementalSource = incremental;
+                _source.CollectionChanged += OnCollectionChanged;
 
                 if (_initialized)
                 {
                     _loading = true;
+                    _replacing = true;
 
                     var token = Cancel();
 
@@ -104,6 +116,7 @@ namespace Telegram.Collections
                     if (token.IsCancellationRequested)
                     {
                         _loading = false;
+                        _replacing = false;
                         return;
                     }
 
@@ -111,6 +124,7 @@ namespace Telegram.Collections
                     UpdateEmpty();
 
                     _loading = false;
+                    _replacing = false;
 
                     // I'm not sure in what conditions this can happen, but it happens
                     if (Count < 1 && incremental.HasMoreItems && !reentrancy)
@@ -119,13 +133,31 @@ namespace Telegram.Collections
                     }
                 }
             }
+            else
+            {
+                _source = default;
+
+                Cancel();
+
+                Clear();
+                UpdateEmpty();
+            }
+        }
+
+        protected override void UpdateItems(IReadOnlyList<DiffItem<T>> items, IDiffHandler<T> diffHandler)
+        {
+            foreach (DiffItem<T> item in items)
+            {
+                // Swap new item with old one to have the same reference in both lists
+                _source[item.NewSeqIndex] = item.OldValue;
+            }
         }
 
         public IAsyncOperation<LoadMoreItemsResult> LoadMoreItemsAsync(uint count)
         {
             return AsyncInfo.Run(async _ =>
             {
-                if (_loading)
+                if (_loading || _source == null)
                 {
                     return new LoadMoreItemsResult
                     {
@@ -136,19 +168,22 @@ namespace Telegram.Collections
                 _loading = true;
 
                 var token = Cancel();
-                var result = await _incrementalSource?.LoadMoreItemsAsync(count);
+                var result = await _source?.LoadMoreItemsAsync(count);
 
                 if (result.Count > 0 && !token.IsCancellationRequested)
                 {
-                    var diff = await Task.Run(() => DiffUtil.CalculateDiff(this, _source, DefaultDiffHandler, DefaultOptions));
+                    //var diff = await Task.Run(() => DiffUtil.CalculateDiff(this, _source, DefaultDiffHandler, DefaultOptions));
 
-                    if (token.IsCancellationRequested)
-                    {
-                        _loading = false;
-                        return result;
-                    }
+                    //if (token.IsCancellationRequested)
+                    //{
+                    //    _loading = false;
+                    //    return result;
+                    //}
 
-                    ReplaceDiff(diff);
+                    //_replacingDiff = true;
+                    //ReplaceDiff(diff);
+
+                    //_replacingDiff = false;
                     UpdateEmpty();
                 }
 
@@ -159,13 +194,37 @@ namespace Telegram.Collections
             });
         }
 
+        private void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (_replacing)
+            {
+                return;
+            }
+
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                    InsertRange(e.NewStartingIndex, e.NewItems);
+                    break;
+                case NotifyCollectionChangedAction.Remove:
+                    RemoveRange(e.OldStartingIndex, e.OldItems.Count);
+                    break;
+                case NotifyCollectionChangedAction.Move:
+                    Move(e.OldStartingIndex, e.NewStartingIndex);
+                    break;
+                case NotifyCollectionChangedAction.Reset:
+                    ReplaceWith(_source);
+                    break;
+            }
+        }
+
         public bool HasMoreItems
         {
             get
             {
-                if (_incrementalSource != null)
+                if (_source != null)
                 {
-                    return _incrementalSource.HasMoreItems;
+                    return _source.HasMoreItems;
                 }
 
                 _initialized = true;

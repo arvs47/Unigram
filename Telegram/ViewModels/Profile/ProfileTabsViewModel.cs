@@ -4,11 +4,9 @@
 // Distributed under the GNU General Public License v3.0. (See accompanying
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
-using Rg.DiffUtils;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Collections;
@@ -17,31 +15,64 @@ using Telegram.Navigation;
 using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Td.Api;
-using Telegram.ViewModels.Delegates;
 using Telegram.Views;
 using Telegram.Views.Chats;
-using Telegram.Views.Popups;
 using Telegram.Views.Profile;
-using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 using WinRT;
 
 namespace Telegram.ViewModels.Profile
 {
     [GeneratedBindableCustomProperty]
-    public partial class ProfileTabItem
+    public partial class ProfileTabItem : BindableBase
     {
-        public string Text { get; set; }
-
-        public Type Type { get; set; }
-
-        public object Parameter { get; set; }
+        private readonly ICollectionWithTotalCount _items;
+        private readonly int _totalCount;
+        private readonly string _locale;
 
         public ProfileTabItem(string text, Type type, object parameter = null)
         {
             Text = text;
             Type = type;
             Parameter = parameter;
+        }
+
+        public ProfileTabItem(string text, Type type, object parameter, int totalCount, string locale)
+        {
+            Text = text;
+            Type = type;
+            Parameter = parameter;
+
+            _totalCount = totalCount;
+            _locale = locale;
+        }
+
+        public ProfileTabItem(string text, Type type, object parameter, ICollectionWithTotalCount items, string locale)
+        {
+            Text = text;
+            Type = type;
+            Parameter = parameter;
+
+            _items = items;
+            _items.PropertyChanged += OnPropertyChanged;
+
+            _locale = locale;
+        }
+
+        public string Text { get; set; }
+
+        public Type Type { get; set; }
+
+        public object Parameter { get; set; }
+
+        public string Subtitle => Locale.Declension(_locale, _items?.TotalCount ?? _totalCount);
+
+        private void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(_items.TotalCount))
+            {
+                RaisePropertyChanged(nameof(Subtitle));
+            }
         }
     }
 
@@ -50,13 +81,8 @@ namespace Telegram.ViewModels.Profile
 
     }
 
-    public partial class ProfileTabsViewModel : MultiViewModelBase, IHandle
+    public abstract partial class ProfileTabsViewModel : MediaTabsViewModelBase, IHandle
     {
-        private readonly IPlaybackService _playbackService;
-        private readonly IStorageService _storageService;
-
-        private readonly IMessageDelegate _messageDelegate;
-
         protected readonly ProfileSavedChatsTabViewModel _savedChatsViewModel;
         protected readonly ProfileStoriesTabViewModel _pinnedStoriesTabViewModel;
         protected readonly ProfileStoriesTabViewModel _archivedStoriesTabViewModel;
@@ -66,14 +92,9 @@ namespace Telegram.ViewModels.Profile
         protected readonly ProfileGiftsTabViewModel _giftsTabViewModel;
         protected readonly ProfileMembersTabViewModel _membersTabVieModel;
 
-        public ProfileTabsViewModel(IClientService clientService, ISettingsService settingsService, IStorageService storageService, IEventAggregator aggregator, IPlaybackService playbackService)
-            : base(clientService, settingsService, aggregator)
+        public ProfileTabsViewModel(IClientService clientService, ISettingsService settingsService, IStorageService storageService, IEventAggregator aggregator)
+            : base(clientService, settingsService, storageService, aggregator)
         {
-            _playbackService = playbackService;
-            _storageService = storageService;
-
-            _messageDelegate = new MessageDelegate(this);
-
             _savedChatsViewModel = TypeResolver.Current.Resolve<ProfileSavedChatsTabViewModel>(clientService.SessionId);
             _pinnedStoriesTabViewModel = TypeResolver.Current.Resolve<ProfileStoriesTabViewModel>(clientService.SessionId);
             _archivedStoriesTabViewModel = TypeResolver.Current.Resolve<ProfileStoriesTabViewModel>(clientService.SessionId);
@@ -97,32 +118,9 @@ namespace Telegram.ViewModels.Profile
             Children.Add(_membersTabVieModel);
 
             Items = new ObservableCollection<ProfileTabItem>();
-
-            SelectedItems = new MvxObservableCollection<MessageWithOwner>();
-            SelectedItems.CollectionChanged += OnCollectionChanged;
-
-            Media = new SearchCollection<MessageWithOwner, MediaCollection>(SetSearch, new SearchMessagesFilterPhotoAndVideo(), new MessageDiffHandler());
-            Files = new SearchCollection<MessageWithOwner, MediaCollection>(SetSearch, new SearchMessagesFilterDocument(), new MessageDiffHandler());
-            Links = new SearchCollection<MessageWithOwner, MediaCollection>(SetSearch, new SearchMessagesFilterUrl(), new MessageDiffHandler());
-            Music = new SearchCollection<MessageWithOwner, MediaCollection>(SetSearch, new SearchMessagesFilterAudio(), new MessageDiffHandler());
-            Voice = new SearchCollection<MessageWithOwner, MediaCollection>(SetSearch, new SearchMessagesFilterVoiceNote(), new MessageDiffHandler());
-            Animations = new SearchCollection<MessageWithOwner, MediaCollection>(SetSearch, new SearchMessagesFilterAnimation(), new MessageDiffHandler());
-        }
-
-        private async void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
-        {
-            var selectedItems = SelectedItems.ToList();
-            var properties = await ClientService.GetMessagePropertiesAsync(selectedItems.Select(x => new MessageId(x)));
-
-            CanDeleteSelectedMessages = properties.Count > 0 && properties.Values.All(x => x.CanBeDeletedForAllUsers || x.CanBeDeletedOnlyForSelf);
-            CanForwardSelectedMessages = properties.Count > 0 && properties.Values.All(x => x.CanBeForwarded);
         }
 
         public ObservableCollection<ProfileTabItem> Items { get; }
-
-        public IPlaybackService PlaybackService => _playbackService;
-
-        public IStorageService StorageService => _storageService;
 
         protected ForumTopic _forumTopic;
         public ForumTopic ForumTopic
@@ -138,9 +136,9 @@ namespace Telegram.ViewModels.Profile
             set => Set(ref _savedMessagesTopic, value);
         }
 
-        public MessageTopic Topic { get; set; }
-
         public bool MyProfile { get; private set; }
+
+        public bool IsSavedMessages { get; private set; }
 
         public override Task NavigatedToAsync(object parameter, NavigationMode mode, NavigationState state)
         {
@@ -148,6 +146,15 @@ namespace Telegram.ViewModels.Profile
             {
                 parameter = ClientService.Options.MyId;
                 MyProfile = true;
+            }
+
+            if (parameter is long chatId && !MyProfile)
+            {
+                IsSavedMessages = chatId == ClientService.Options.MyId;
+            }
+            else if (parameter is ChatMessageTopic chatMessageTopic)
+            {
+                IsSavedMessages = chatMessageTopic.ChatId == ClientService.Options.MyId;
             }
 
             return base.NavigatedToAsync(parameter, mode, state);
@@ -176,19 +183,10 @@ namespace Telegram.ViewModels.Profile
             Voice.UpdateQuery(string.Empty);
             Animations.UpdateQuery(string.Empty);
 
-            Aggregator.Subscribe<UpdateDeleteMessages>(this, Handle);
-
             if (Items.Empty())
             {
                 await UpdateTabsAsync(Chat);
             }
-        }
-
-        private int[] _sharedCount = new int[] { 0, 0, 0, 0, 0, 0 };
-        public int[] SharedCount
-        {
-            get => _sharedCount;
-            set => Set(ref _sharedCount, value);
         }
 
         private ProfileTabItem _selectedItem;
@@ -198,142 +196,97 @@ namespace Telegram.ViewModels.Profile
             set => Set(ref _selectedItem, value);
         }
 
-        private async Task UpdateTabsAsync(Chat chat)
-        {
-            if (_savedMessagesTopic != null)
-            {
-                await UpdateSharedCountAsync(chat);
-            }
-            else if (chat.Type is ChatTypePrivate or ChatTypeSecret)
-            {
-                var user = ClientService.GetUser(chat);
-                var cached = ClientService.GetUserFull(chat);
+        protected abstract Task UpdateTabsAsync(Chat chat);
 
-                // This should really rarely happen
-                cached ??= await ClientService.SendAsync(new GetUserFullInfo(user.Id)) as UserFullInfo;
-
-                if (MyProfile && user.Id == ClientService.Options.MyId)
-                {
-                    AddTab(new ProfileTabItem(Strings.ProfileStories, typeof(ProfileStoriesTabPage), ChatStoriesType.Pinned));
-                    AddTab(new ProfileTabItem(Strings.ArchivedStories, typeof(ProfileStoriesTabPage), ChatStoriesType.Archive));
-
-                    if (cached != null && cached.GiftCount > 0)
-                    {
-                        AddTab(new ProfileTabItem(Strings.ProfileGifts, typeof(ProfileGiftsTabPage)));
-                    }
-                }
-                else
-                {
-                    if (user.Id == ClientService.Options.MyId)
-                    {
-                        AddTab(new ProfileTabItem(Strings.SavedDialogsTab, typeof(ProfileSavedChatsTabPage)));
-                    }
-                    else if (cached != null && cached.HasPostedToProfileStories)
-                    {
-                        AddTab(new ProfileTabItem(Strings.ProfileStories, typeof(ProfileStoriesTabPage), ChatStoriesType.Pinned));
-                    }
-                    else if (cached?.BotInfo != null && cached.BotInfo.HasMediaPreviews)
-                    {
-                        AddTab(new ProfileTabItem(Strings.ProfileBotPreviewTab, typeof(ProfileStoriesTabPage), ChatStoriesType.Pinned));
-                    }
-
-                    if (cached != null && cached.GiftCount > 0)
-                    {
-                        AddTab(new ProfileTabItem(Strings.ProfileGifts, typeof(ProfileGiftsTabPage)));
-                    }
-
-                    await UpdateSharedCountAsync(chat);
-
-                    if (cached != null && cached.GroupInCommonCount > 0)
-                    {
-                        AddTab(new ProfileTabItem(Strings.SharedGroupsTab2, typeof(ProfileGroupsTabPage)));
-                    }
-
-                    if (user.Type is UserTypeBot)
-                    {
-                        await _botsTabViewModel.LoadMoreItemsAsync(0);
-
-                        if (_botsTabViewModel.Items.Count > 0)
-                        {
-                            AddTab(new ProfileTabItem(Strings.SimilarBotsTab, typeof(ProfileBotsTabPage)));
-                        }
-                    }
-                }
-            }
-            else if (chat.Type is ChatTypeSupergroup typeSupergroup)
-            {
-                var supergroup = ClientService.GetSupergroup(chat);
-                var cached = ClientService.GetSupergroupFull(chat);
-
-                // This should really rarely happen
-                cached ??= await ClientService.SendAsync(new GetSupergroupFullInfo(supergroup.Id)) as SupergroupFullInfo;
-
-                if (ForumTopic == null && cached?.HasPinnedStories is true)
-                {
-                    AddTab(new ProfileTabItem(Strings.ProfileStories, typeof(ProfileStoriesTabPage)));
-                }
-
-                if (ForumTopic == null && cached?.GiftCount > 0)
-                {
-                    AddTab(new ProfileTabItem(Strings.ProfileGifts, typeof(ProfileGiftsTabPage)));
-                }
-
-                if (typeSupergroup.IsChannel)
-                {
-                    await UpdateSharedCountAsync(chat);
-                    await _channelsTabViewModel.LoadMoreItemsAsync(0);
-
-                    if (_channelsTabViewModel.Items.Count > 0)
-                    {
-                        AddTab(new ProfileTabItem(Strings.SimilarChannelsTab, typeof(ProfileChannelsTabPage)));
-                    }
-                }
-                else
-                {
-                    if (ForumTopic == null)
-                    {
-                        AddTab(new ProfileTabItem(Strings.ChannelMembers, typeof(ProfileMembersTabPage)));
-                    }
-
-                    await UpdateSharedCountAsync(chat);
-                }
-            }
-            else if (chat.Type is ChatTypeBasicGroup)
-            {
-                AddTab(new ProfileTabItem(Strings.ChannelMembers, typeof(ProfileMembersTabPage)));
-                await UpdateSharedCountAsync(chat);
-            }
-        }
-
-        private async Task UpdateSharedCountAsync(Chat chat)
+        protected async Task UpdateSharedCountAsync(Chat chat)
         {
             var filters = new SearchMessagesFilter[]
             {
                 new SearchMessagesFilterPhotoAndVideo(),
+                new SearchMessagesFilterEmpty(),
                 new SearchMessagesFilterDocument(),
                 new SearchMessagesFilterUrl(),
                 new SearchMessagesFilterAudio(),
-                new SearchMessagesFilterVoiceNote(),
+                new SearchMessagesFilterVoiceAndVideoNote(),
                 new SearchMessagesFilterAnimation(),
             };
 
+            var sparseMessagesAvailable = SettingsService.Current.Diagnostics.SparseMessagesDebug
+                && Topic is MessageTopicSavedMessages or null;
+
+            var savedMessagesTopicId = 0L;
+            if (Topic is MessageTopicSavedMessages savedMessagesTopic)
+            {
+                savedMessagesTopicId = savedMessagesTopic.SavedMessagesTopicId;
+            }
+
+            async Task<Count> GetCountAsync(SearchMessagesFilter filter)
+            {
+                if (filter is SearchMessagesFilterEmpty)
+                {
+                    if (IsSavedMessages || MyProfile || !SettingsService.Current.Diagnostics.SavedMessagesDebug)
+                    {
+                        return new Count(0);
+                    }
+
+                    var response = await ClientService.SendAsync(new GetSavedMessagesTopicHistory(chat.Id, 0, 0, 1));
+                    if (response is Messages messages)
+                    {
+                        return new Count(messages.TotalCount);
+                    }
+
+                    return new Count(0);
+                }
+
+                if (sparseMessagesAvailable && filter is SearchMessagesFilterPhotoAndVideo or SearchMessagesFilterDocument or SearchMessagesFilterAudio or SearchMessagesFilterVoiceAndVideoNote or SearchMessagesFilterAnimation)
+                {
+                    var source = await MediaDataSource.Create(ClientService, chat.Id, savedMessagesTopicId, filter);
+                    if (source.Count > 0)
+                    {
+                        switch (filter)
+                        {
+                            case SearchMessagesFilterPhotoAndVideo:
+                            case SearchMessagesFilterPhoto:
+                            case SearchMessagesFilterVideo:
+                                Media.DataSource = source;
+                                break;
+                            case SearchMessagesFilterDocument:
+                                Files.DataSource = source;
+                                break;
+                            case SearchMessagesFilterAudio:
+                                Music.DataSource = source;
+                                break;
+                            case SearchMessagesFilterVoiceAndVideoNote:
+                                Voice.DataSource = source;
+                                break;
+                            case SearchMessagesFilterAnimation:
+                                Animations.DataSource = source;
+                                break;
+                        }
+                    }
+
+                    return new Count(source.Count);
+                }
+
+                return await ClientService.SendAsync(new GetChatMessageCount(chat.Id, Topic, filter, false)) as Count;
+            }
+
             for (int i = 0; i < filters.Length; i++)
             {
-                var response = await ClientService.SendAsync(new GetChatMessageCount(chat.Id, Topic, filters[i], false));
+                var response = await GetCountAsync(filters[i]);
                 if (response is Count count)
                 {
-                    SharedCount[i] = count.CountValue;
-
                     if (count.CountValue > 0)
                     {
                         var item = filters[i] switch
                         {
-                            SearchMessagesFilterPhotoAndVideo => new ProfileTabItem(Strings.SharedMediaTab2, typeof(ProfileMediaTabPage)),
-                            SearchMessagesFilterDocument => new ProfileTabItem(Strings.SharedFilesTab2, typeof(ProfileFilesTabPage)),
-                            SearchMessagesFilterUrl => new ProfileTabItem(Strings.SharedLinksTab2, typeof(ProfileLinksTabPage)),
-                            SearchMessagesFilterAudio => new ProfileTabItem(Strings.SharedMusicTab2, typeof(ProfileMusicTabPage)),
-                            SearchMessagesFilterVoiceNote => new ProfileTabItem(Strings.SharedVoiceTab2, typeof(ProfileVoiceTabPage)),
-                            SearchMessagesFilterAnimation => new ProfileTabItem(Strings.SharedGIFsTab2, typeof(ProfileAnimationsTabPage)),
+                            SearchMessagesFilterPhotoAndVideo => new ProfileTabItem(Strings.SharedMediaTab2, typeof(ProfileMediaTabPage), null, count.CountValue, Strings.R.Media),
+                            SearchMessagesFilterEmpty => new ProfileTabItem(Strings.SavedMessagesTab2, typeof(ProfileSavedMessagesTabPage), new ChatMessageTopic(ClientService.Options.MyId, new MessageTopicSavedMessages(chat.Id)), count.CountValue, Strings.R.SavedMessagesCount),
+                            SearchMessagesFilterDocument => new ProfileTabItem(Strings.SharedFilesTab2, typeof(ProfileFilesTabPage), null, count.CountValue, Strings.R.Files),
+                            SearchMessagesFilterUrl => new ProfileTabItem(Strings.SharedLinksTab2, typeof(ProfileLinksTabPage), null, count.CountValue, Strings.R.Links),
+                            SearchMessagesFilterAudio => new ProfileTabItem(Strings.SharedMusicTab2, typeof(ProfileMusicTabPage), null, count.CountValue, Strings.R.MusicFiles),
+                            SearchMessagesFilterVoiceAndVideoNote => new ProfileTabItem(Strings.SharedVoiceTab2, typeof(ProfileVoiceTabPage), null, count.CountValue, Strings.R.Voice),
+                            SearchMessagesFilterAnimation => new ProfileTabItem(Strings.SharedGIFsTab2, typeof(ProfileAnimationsTabPage), null, count.CountValue, Strings.R.GIFs),
                             _ => null
                         };
 
@@ -343,48 +296,19 @@ namespace Telegram.ViewModels.Profile
             }
         }
 
-        private void AddTab(ProfileTabItem item)
+        protected void AddTab(ProfileTabItem item)
         {
             Items.Add(item);
 
             if (Items.Count == 1)
             {
                 SelectedItem ??= Items.FirstOrDefault();
-                RaisePropertyChanged(nameof(SharedCount));
             }
         }
 
-        public void Handle(UpdateDeleteMessages update)
+        protected override bool ShouldHandleDeleteMessages(UpdateDeleteMessages update)
         {
-            if (update.ChatId == _chat?.Id && !update.FromCache)
-            {
-                var table = update.MessageIds.ToHashSet();
-
-                BeginOnUIThread(() =>
-                {
-                    UpdateDeleteMessages(Media, table);
-                    UpdateDeleteMessages(Files, table);
-                    UpdateDeleteMessages(Links, table);
-                    UpdateDeleteMessages(Music, table);
-                    UpdateDeleteMessages(Voice, table);
-                    UpdateDeleteMessages(Animations, table);
-                });
-            }
-        }
-
-        private void UpdateDeleteMessages(SearchCollection<MessageWithOwner, MediaCollection> target, HashSet<long> table)
-        {
-            target.Cancel();
-
-            for (int i = 0; i < target.Count; i++)
-            {
-                var message = target[i];
-                if (table.Contains(message.Id))
-                {
-                    target.RemoveAt(i);
-                    i--;
-                }
-            }
+            return update.ChatId == _chat?.Id;
         }
 
         protected Chat _chat;
@@ -401,279 +325,36 @@ namespace Telegram.ViewModels.Profile
             set => Set(ref _selectedIndex, value);
         }
 
-        public SearchCollection<MessageWithOwner, MediaCollection> Media { get; private set; }
-        public SearchCollection<MessageWithOwner, MediaCollection> Files { get; private set; }
-        public SearchCollection<MessageWithOwner, MediaCollection> Links { get; private set; }
-        public SearchCollection<MessageWithOwner, MediaCollection> Music { get; private set; }
-        public SearchCollection<MessageWithOwner, MediaCollection> Voice { get; private set; }
-        public SearchCollection<MessageWithOwner, MediaCollection> Animations { get; private set; }
-
-        public MediaCollection SetSearch(object sender, string query)
+        public override MediaCollection SetSearch(object sender, string query)
         {
-            if (sender is SearchMessagesFilter filter)
+            var target = sender switch
             {
+                SearchMessagesFilterPhotoAndVideo => Media,
+                SearchMessagesFilterPhoto => Media,
+                SearchMessagesFilterVideo => Media,
+                SearchMessagesFilterDocument => Files,
+                SearchMessagesFilterAudio => Music,
+                SearchMessagesFilterVoiceAndVideoNote => Voice,
+                SearchMessagesFilterAnimation => Animations,
+                _ => null
+            };
+
+            if (sender is SearchMessagesFilter filter && (target?.DataSource == null || query.Length > 0))
+            {
+                if (target != null)
+                {
+                    target.UseDataSource = false;
+                }
+
                 return new MediaCollection(ClientService, Chat.Id, Topic, filter, query);
+            }
+
+            if (target != null)
+            {
+                target.UseDataSource = true;
             }
 
             return null;
         }
-
-        public partial class MessageDiffHandler : IDiffHandler<MessageWithOwner>
-        {
-            public bool CompareItems(MessageWithOwner oldItem, MessageWithOwner newItem)
-            {
-                return oldItem?.Id == newItem?.Id && oldItem?.ChatId == newItem?.ChatId;
-            }
-
-            public void UpdateItem(MessageWithOwner oldItem, MessageWithOwner newItem)
-            {
-            }
-        }
-
-        public ObservableCollection<MessageWithOwner> SelectedItems { get; }
-
-        #region View
-
-        public void ViewMessage(MessageWithOwner message)
-        {
-            var chat = _chat;
-            if (chat == null)
-            {
-                return;
-            }
-
-            NavigationService.NavigateToChat(chat, message.Id, Topic);
-        }
-
-        #endregion
-
-        #region Save file as
-
-        public async void SaveMessageMedia(MessageWithOwner message)
-        {
-            var file = message.GetFile();
-            if (file != null)
-            {
-                await _storageService.SaveFileAsAsync(file);
-            }
-        }
-
-        #endregion
-
-        #region Open with
-
-        public async void OpenMessageWith(MessageWithOwner message)
-        {
-            var file = message.GetFile();
-            if (file != null)
-            {
-                await _storageService.OpenFileWithAsync(file);
-            }
-        }
-
-        #endregion
-
-        #region Show in folder
-
-        public async void OpenMessageFolder(MessageWithOwner message)
-        {
-            var file = message.GetFile();
-            if (file != null)
-            {
-                await _storageService.OpenFolderAsync(file);
-            }
-        }
-
-        #endregion
-
-        #region Delete
-
-        public void DeleteMessage(MessageWithOwner message)
-        {
-            if (message == null)
-            {
-                return;
-            }
-
-            var chat = ClientService.GetChat(message.ChatId);
-            if (chat == null)
-            {
-                return;
-            }
-
-            //if (message != null && message.Media is TLMessageMediaGroup groupMedia)
-            //{
-            //    ExpandSelection(new[] { message });
-            //    MessagesDeleteExecute();
-            //    return;
-            //}
-
-            DeleteMessages(chat, new[] { message });
-        }
-
-        private async void DeleteMessages(Chat chat, IList<MessageWithOwner> messages)
-        {
-            var first = messages.FirstOrDefault();
-            if (first == null)
-            {
-                return;
-            }
-
-            var items = messages
-                .DistinctBy(x => x.Id)
-                .Select(x => x.Get())
-                .ToList();
-
-            var properties = await ClientService.GetMessagePropertiesAsync(items.Select(x => new MessageId(x)));
-
-            var updated = items
-                .Where(x => properties.ContainsKey(new MessageId(x)))
-                .ToList();
-
-            if (updated.Empty())
-            {
-                return;
-            }
-
-            var popup = new DeleteMessagesPopup(ClientService, chat, Topic, updated, properties);
-
-            var confirm = await ShowPopupAsync(popup);
-            if (confirm != ContentDialogResult.Primary)
-            {
-                return;
-            }
-
-            UnselectMessages();
-
-            ClientService.Send(new DeleteMessages(chat.Id, messages.Select(x => x.Id).ToList(), popup.Revoke));
-
-            foreach (var sender in popup.DeleteAll)
-            {
-                ClientService.Send(new DeleteChatMessagesBySender(chat.Id, sender));
-            }
-
-            foreach (var sender in popup.BanUser)
-            {
-                ClientService.Send(new SetChatMemberStatus(chat.Id, sender, popup.SelectedStatus));
-            }
-
-            if (chat.Type is ChatTypeSupergroup supertype)
-            {
-                foreach (var sender in popup.ReportSpam)
-                {
-                    var messageIds = messages
-                        .Where(x => x.SenderId.AreTheSame(sender))
-                        .Select(x => x.Id)
-                        .ToList();
-
-                    ClientService.Send(new ReportSupergroupSpam(supertype.SupergroupId, messageIds));
-                }
-            }
-        }
-
-        #endregion
-
-        #region Forward
-
-        public async void ForwardMessage(MessageWithOwner message)
-        {
-            UnselectMessages();
-            await ShowPopupAsync(new ChooseChatsPopup(), new ChooseChatsConfigurationShareMessage(message.ChatId, message.Id));
-        }
-
-        #endregion
-
-        #region Multiple Delete
-
-        public void DeleteSelectedMessages()
-        {
-            var messages = new List<MessageWithOwner>(SelectedItems);
-
-            var first = messages.FirstOrDefault();
-            if (first == null)
-            {
-                return;
-            }
-
-            var chat = ClientService.GetChat(first.ChatId);
-            if (chat == null)
-            {
-                return;
-            }
-
-            DeleteMessages(chat, messages);
-        }
-
-        private bool _canDeleteSelectedMessages;
-        public bool CanDeleteSelectedMessages
-        {
-            get => _canDeleteSelectedMessages;
-            set => Set(ref _canDeleteSelectedMessages, value);
-        }
-
-        #endregion
-
-        #region Multiple Forward
-
-        public async void ForwardSelectedMessages()
-        {
-            var selectedItems = SelectedItems.ToList();
-            var properties = await ClientService.GetMessagePropertiesAsync(selectedItems.Select(x => new MessageId(x)));
-
-            var messages = properties.Where(x => x.Value.CanBeForwarded).OrderBy(x => x.Key.Id).ToList();
-            if (messages.Count > 0)
-            {
-                UnselectMessages();
-                await ShowPopupAsync(new ChooseChatsPopup(), new ChooseChatsConfigurationShareMessages(messages.Select(x => x.Key)));
-            }
-        }
-
-        private bool _canForwardSelectedMessages;
-        public bool CanForwardSelectedMessages
-        {
-            get => _canForwardSelectedMessages;
-            set => Set(ref _canForwardSelectedMessages, value);
-        }
-
-        #endregion
-
-        #region Select
-
-        public void SelectMessage(MessageWithOwner message)
-        {
-            SelectedItems.Add(message);
-        }
-
-        #endregion
-
-        #region Unselect
-
-        public void UnselectMessages()
-        {
-            SelectedItems.Clear();
-        }
-
-        #endregion
-
-        #region Delegate
-
-        public IMessageDelegate MessageDelegate => _messageDelegate;
-
-        public void OpenUsername(string username)
-        {
-            _messageDelegate.OpenUsername(username);
-        }
-
-        public void OpenUser(long userId)
-        {
-            _messageDelegate.OpenUser(userId);
-        }
-
-        public void OpenUrl(string url, bool untrust)
-        {
-            _messageDelegate.OpenUrl(url, untrust);
-        }
-
-        #endregion
     }
 }

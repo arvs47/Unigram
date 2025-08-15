@@ -11,6 +11,7 @@ using System.Linq;
 using System.Numerics;
 using Telegram.Common;
 using Telegram.Controls;
+using Telegram.Controls.Drawers;
 using Telegram.Controls.Messages;
 using Telegram.Navigation;
 using Telegram.Services;
@@ -35,7 +36,7 @@ namespace Telegram.Views.Popups
     {
         private readonly CreatePollViewModel _viewModel;
 
-        public CreatePollPopup(IClientService clientService, bool forceQuiz, bool forceRegular, bool forceAnonymous)
+        public CreatePollPopup(IClientService clientService, FormattedText question, bool forceQuiz, bool forceRegular, bool forceAnonymous)
         {
             InitializeComponent();
 
@@ -45,6 +46,11 @@ namespace Telegram.Views.Popups
 
             QuestionText.DataContext = _viewModel;
             EmojiPanel.DataContext = EmojiDrawerViewModel.Create(clientService.SessionId);
+
+            if (question != null)
+            {
+                QuestionText.SetText(question);
+            }
 
             Title = Strings.NewPoll;
             PrimaryButtonText = Strings.OK;
@@ -149,14 +155,6 @@ namespace Telegram.Views.Popups
         }
 
         public ObservableCollection<PollOptionViewModel> Items { get; private set; }
-
-        private void ContentDialog_PrimaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
-        {
-        }
-
-        private void ContentDialog_SecondaryButtonClick(ContentDialog sender, ContentDialogButtonClickEventArgs args)
-        {
-        }
 
         private void AddAnOption_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -271,7 +269,17 @@ namespace Telegram.Views.Popups
             }
         }
 
-        private void Question_GotFocus(object sender, RoutedEventArgs e)
+        private void QuestionText_GotFocus(object sender, RoutedEventArgs e)
+        {
+            OnVisibleChanged(QuestionEmoji, true);
+        }
+
+        private void QuestionText_LostFocus(object sender, RoutedEventArgs e)
+        {
+            OnVisibleChanged(QuestionEmoji, false);
+        }
+
+        private void Option_GotFocus(object sender, RoutedEventArgs e)
         {
             AddAnOption.IsReadOnly = false;
 
@@ -281,7 +289,7 @@ namespace Telegram.Views.Popups
             }
         }
 
-        private void Question_LostFocus(object sender, RoutedEventArgs e)
+        private void Option_LostFocus(object sender, RoutedEventArgs e)
         {
             if (sender is FormattedTextBox textBox && textBox.Parent != null)
             {
@@ -389,7 +397,7 @@ namespace Telegram.Views.Popups
             EmojiFlyout.ShowAt(textBox, new FlyoutShowOptions { ShowMode = FlyoutShowMode.Transient });
         }
 
-        private void Emoji_ItemClick(object sender, ItemClickEventArgs e)
+        private void Emoji_ItemClick(object sender, EmojiDrawerItemClickEventArgs e)
         {
             if (e.ClickedItem is EmojiData emoji)
             {

@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using Telegram.Common;
+using Telegram.Controls.Media;
 using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Drawers;
@@ -36,7 +37,6 @@ namespace Telegram.Controls.Drawers
         public event EventHandler<StickerDrawerItemClickEventArgs> ItemClick;
         public event EventHandler<ItemContextRequestedEventArgs<Sticker>> ItemContextRequested;
         public event EventHandler ChoosingItem;
-        public event EventHandler SettingsClick;
 
         private readonly AnimatedListHandler _handler;
         private readonly ZoomableListHandler _zoomer;
@@ -216,11 +216,6 @@ namespace Telegram.Controls.Drawers
             }
         }
 
-        private void Settings_Click(object sender, RoutedEventArgs e)
-        {
-            SettingsClick?.Invoke(this, EventArgs.Empty);
-        }
-
         private async void OnChoosingGroupHeaderContainer(ListViewBase sender, ChoosingGroupHeaderContainerEventArgs args)
         {
             if (args.GroupHeaderContainer == null)
@@ -332,14 +327,20 @@ namespace Telegram.Controls.Drawers
                 Automation.SetToolTip(args.ItemContainer, sticker.Title);
 
                 var content = args.ItemContainer.ContentTemplateRoot as Grid;
-
-                if (content == null || sticker == null || (sticker.Thumbnail == null && sticker.Covers == null))
+                if (content?.Children[0] is FontIcon icon)
                 {
-                    return;
+                    icon.Glyph = sticker.Name switch
+                    {
+                        "tg/favedStickers" => Icons.Bookmark,
+                        "tg/recentlyUsed" => Icons.EmojiRecents,
+                        "tg/collectibles" => Icons.Diamond,
+                        _ => string.Empty
+                    };
                 }
-
-                var animation = content.Children[0] as AnimatedImage;
-                animation.Source = DelayedFileSource.FromStickerSetInfo(ViewModel.ClientService, sticker);
+                else if (content?.Children[0] is AnimatedImage animated)
+                {
+                    animated.Source = DelayedFileSource.FromStickerSetInfo(ViewModel.ClientService, sticker);
+                }
 
                 args.Handled = true;
             }

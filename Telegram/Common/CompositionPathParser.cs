@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Telegram.Native;
 using Telegram.Navigation;
 using Telegram.Td.Api;
 using Windows.UI;
@@ -35,55 +36,20 @@ namespace Telegram.Common
             return null;
         }
 
-        public static CompositionPath Parse(IList<ClosedVectorPath> contours)
+        public static CanvasGeometry Parse(ICanvasResourceCreator resourceCreator, string data)
         {
-            return new CompositionPath(Parse(null, contours));
-        }
+            var reader = new PathDataReader(data);
 
-        public static CanvasGeometry Parse(ICanvasResourceCreator sender, IList<ClosedVectorPath> contours)
-        {
-            using var builder = new CanvasPathBuilder(sender);
-
-            foreach (var path in contours)
+            var segments = reader.read();
+            if (segments != null)
             {
-                var open = true;
+                using var builder = new CanvasPathBuilder(resourceCreator);
+                renderPath(segments, builder);
 
-                for (int i = 0; i <= path.Commands.Count; i++)
-                {
-                    var command = path.Commands[i % path.Commands.Count];
-                    if (command is VectorPathCommandLine line)
-                    {
-                        var point = line.EndPoint;
-                        if (open)
-                        {
-                            open = false;
-                            builder.BeginFigure((float)point.X, (float)point.Y);
-                        }
-                        else
-                        {
-                            builder.AddLine((float)point.X, (float)point.Y);
-                        }
-                    }
-                    else if (command is VectorPathCommandCubicBezierCurve cubicBezierCurve)
-                    {
-                        if (open)
-                        {
-                            open = false;
-                            builder.BeginFigure((float)cubicBezierCurve.EndPoint.X, (float)cubicBezierCurve.EndPoint.Y);
-                        }
-                        else
-                        {
-                            builder.AddCubicBezier(cubicBezierCurve.StartControlPoint.ToVector2(),
-                                cubicBezierCurve.EndControlPoint.ToVector2(),
-                                cubicBezierCurve.EndPoint.ToVector2());
-                        }
-                    }
-                }
-
-                builder.EndFigure(CanvasFigureLoop.Closed);
+                return CanvasGeometry.CreatePath(builder);
             }
 
-            return CanvasGeometry.CreatePath(builder);
+            return null;
         }
 
         public static CompositionAnimation ParseThumbnail(float width, float height, IList<ClosedVectorPath> contours, out ShapeVisual visual, bool animated = true)
@@ -91,7 +57,7 @@ namespace Telegram.Common
             CompositionPath path;
             if (contours?.Count > 0)
             {
-                path = Parse(contours);
+                path = PlaceholderImageHelper.Foreground.GetOutline(contours); //Parse(contours);
             }
             else
             {
@@ -231,7 +197,6 @@ namespace Telegram.Common
         {
             Vector2? currentPoint = null;
             Vector2? cubicPoint = null;
-            Vector2? quadrPoint = null;
             Vector2? initialPoint = null;
 
             void M(float x, float y)
@@ -384,18 +349,10 @@ namespace Telegram.Common
                 //context.fillPath();
             }
 
-            void setQuadrPoint(Vector2 p, Vector2 quadr)
-            {
-                currentPoint = p;
-                quadrPoint = quadr;
-                cubicPoint = null;
-            }
-
             void setCubicPoint(Vector2 p, Vector2 cubic)
             {
                 currentPoint = p;
                 cubicPoint = cubic;
-                quadrPoint = null;
             }
 
             void setInitPoint(Vector2 p)
@@ -408,7 +365,6 @@ namespace Telegram.Common
             {
                 currentPoint = p;
                 cubicPoint = null;
-                quadrPoint = null;
             }
 
             foreach (var segment in segments)

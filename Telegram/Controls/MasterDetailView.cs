@@ -7,6 +7,7 @@
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Numerics;
 using Telegram.Assets.Icons;
 using Telegram.Collections;
@@ -35,7 +36,7 @@ namespace Telegram.Controls
         Background
     }
 
-    public sealed partial class MasterDetailView : ContentControl, IDisposable
+    public sealed partial class MasterDetailView : ContentControl, INotifyPropertyChanged, IDisposable
     {
         private MasterDetailPanel AdaptivePanel;
         private Frame DetailFrame;
@@ -80,6 +81,7 @@ namespace Telegram.Controls
             {
                 service = BootStrapper.Current.NavigationServiceFactory(viewModel.NavigationService.Window, BootStrapper.BackButton.Ignore, viewModel.SessionId, key + viewModel.SessionId, false) as NavigationService;
                 service.Frame.DataContext = new object();
+                service.Frame.CacheSize = 5;
                 service.FrameFacade.BackRequested += OnBackRequested;
                 service.BackStackChanged += OnBackStackChanged;
                 service.Navigated += OnNavigated;
@@ -337,6 +339,7 @@ namespace Telegram.Controls
             DetailHeaderPresenter.ItemsSource = _backStack;
             DetailHeaderPresenter.ItemClicked += DetailHeaderPresenter_ItemClicked;
 
+            BackgroundPart.SizeChanged += BackgroundPart_SizeChanged;
             BackgroundPart.Update(ViewModel.ClientService, ViewModel.Aggregator);
             BackgroundPart.Visibility = _backgroundType == BackgroundKind.Background ? Visibility.Visible : Visibility.Collapsed;
             BorderPart.Visibility = _backgroundType != BackgroundKind.None ? Visibility.Visible : Visibility.Collapsed;
@@ -386,11 +389,11 @@ namespace Telegram.Controls
                         });
                     }
 
-                    if (HasMaster)
+                    if (HasMaster && !NavigationService.IsNavigating)
                     {
-                        if (DetailFrame.CurrentSourcePageType == null)
+                        if (NavigationService.CurrentPageType == null)
                         {
-                            DetailFrame.Navigate(BlankPageType);
+                            NavigationService.Navigate(BlankPageType);
                         }
                         else
                         {
@@ -405,6 +408,16 @@ namespace Telegram.Controls
             {
                 OnViewStateChanged();
             }
+        }
+
+        private void BackgroundPart_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var newSize = e.NewSize.ToVector2();
+            var visual = ElementComposition.GetElementVisual(BackgroundPart);
+            var geometry = visual.Compositor.CreateRoundedRectangleGeometry();
+            geometry.Size = new Vector2(newSize.X + 9, newSize.Y + 9);
+            geometry.CornerRadius = new Vector2(9);
+            visual.Clip = visual.Compositor.CreateGeometricClip(geometry);
         }
 
         private void DetailHeaderPresenter_ItemClicked(BreadcrumbBar sender, BreadcrumbBarItemClickedEventArgs args)
@@ -441,6 +454,11 @@ namespace Telegram.Controls
             if (!_templateApplied)
             {
                 return;
+            }
+
+            if (HasMaster && !NavigationService.CanGoBack && NavigationService.CurrentPageType != BlankPageType)
+            {
+                NavigationService.InsertToBackStack(0, BlankPageType);
             }
 
             if (e.Content is HostedPage hosted)
@@ -760,6 +778,7 @@ namespace Telegram.Controls
             {
                 _prevState = CurrentState;
                 ViewStateChanged?.Invoke(this, EventArgs.Empty);
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentState)));
             }
 
             UpdateMasterVisibility();
@@ -1101,6 +1120,7 @@ namespace Telegram.Controls
         }
 
         public event EventHandler ViewStateChanged;
+        public event PropertyChangedEventHandler PropertyChanged;
 
         #endregion
 

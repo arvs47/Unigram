@@ -1,4 +1,10 @@
-﻿using Microsoft.UI.Xaml.Controls;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Numerics;
 using System.Threading.Tasks;
@@ -24,9 +30,6 @@ using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
-using DispatcherQueue = Windows.System.DispatcherQueue;
-using VirtualKey = Windows.System.VirtualKey;
-using VirtualKeyModifiers = Windows.System.VirtualKeyModifiers;
 
 namespace Telegram.Controls.Stories
 {
@@ -1124,7 +1127,7 @@ namespace Telegram.Controls.Stories
 
         public Task<ContentDialogResult> ShowActionAsync(FrameworkElement target, object text, TeachingTipPlacementMode placement, ElementTheme requestedTheme = ElementTheme.Dark)
         {
-            var toast = ToastPopup.ShowImpl(XamlRoot, target, null, null, placement, requestedTheme);
+            var toast = ToastPopup.ShowImpl(XamlRoot, null as FormattedText, null, placement, requestedTheme, target: target);
             if (toast.Content is Grid content)
             {
                 var tsc = new TaskCompletionSource<ContentDialogResult>();

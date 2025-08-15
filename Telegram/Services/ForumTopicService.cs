@@ -1,4 +1,10 @@
-﻿using System;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -166,6 +172,11 @@ namespace Telegram.Services
             {
                 return value;
             }
+            else if (!_pendingNewTopics.Contains(id))
+            {
+                _pendingNewTopics.Add(id);
+                _clientService.Send(new GetForumTopic(_chatId, id), UpdateNewTopic);
+            }
 
             return null;
         }
@@ -256,9 +267,9 @@ namespace Telegram.Services
         private long _nextOffsetMessageId;
         private long _nextOffsetMessageThreadId;
 
-        private Task<BaseObject> LoadForumTopicsAsync(int count)
+        private Task<Object> LoadForumTopicsAsync(int count)
         {
-            var tsc = new TaskCompletionSource<BaseObject>();
+            var tsc = new TaskCompletionSource<Object>();
             var request = new GetForumTopics(_chatId, string.Empty, _nextOffsetDate, _nextOffsetMessageId, _nextOffsetMessageThreadId, count);
 
             _clientService.Send(request, response =>
@@ -346,6 +357,11 @@ namespace Telegram.Services
         {
             if (_topics.TryGetValue(update.MessageThreadId, out ForumTopic topic))
             {
+                if (!topic.NotificationSettings.AreTheSame(update.NotificationSettings))
+                {
+                    _aggregator.Publish(new UpdateForumTopicNotificationSettings(_chatId, topic.Info.MessageThreadId, topic.NotificationSettings = update.NotificationSettings));
+                }
+
                 UpdateLastReadInboxMessageId(topic, update.LastReadInboxMessageId);
                 UpdateLastReadOutboxMessageId(topic, update.LastReadOutboxMessageId);
 
@@ -384,9 +400,27 @@ namespace Telegram.Services
             {
                 topic.Info = info;
             }
+            else if (_clientService.TryGetChat(_chatId, out Chat chat))
+            {
+                // Preload empty topic to have info readily available
+                _topics[info.MessageThreadId] = new ForumTopic
+                {
+                    DraftMessage = null,
+                    NotificationSettings = chat.NotificationSettings,
+                    UnreadReactionCount = 0,
+                    UnreadMentionCount = 0,
+                    LastReadOutboxMessageId = 0,
+                    LastReadInboxMessageId = 0,
+                    UnreadCount = 0,
+                    IsPinned = false,
+                    Order = 0,
+                    LastMessage = null,
+                    Info = info
+                };
+            }
         }
 
-        private void UpdateNewTopic(BaseObject response)
+        private void UpdateNewTopic(Object response)
         {
             ForumTopic topic;
             ForumTopic newTopic = response as ForumTopic;
@@ -396,6 +430,8 @@ namespace Telegram.Services
                 return;
             }
 
+            _pendingNewTopics.Remove(newTopic.Info.ForumTopicId);
+
             if (_topics.TryGetValue(newTopic.Info.MessageThreadId, out topic))
             {
                 topic.DraftMessage = newTopic.DraftMessage;
@@ -404,12 +440,16 @@ namespace Telegram.Services
                 topic.UnreadMentionCount = newTopic.UnreadMentionCount;
                 topic.UnreadCount = newTopic.UnreadCount;
                 topic.IsPinned = newTopic.IsPinned;
-                topic.LastMessage = newTopic.LastMessage;
                 topic.Info = newTopic.Info;
 
                 UpdateLastReadInboxMessageId(topic, newTopic.LastReadInboxMessageId);
                 UpdateLastReadOutboxMessageId(topic, newTopic.LastReadOutboxMessageId);
-                UpdateLastMessage(topic, newTopic.LastMessage);
+
+                // TODO: Not sure this is right
+                if (newTopic.LastMessage != null)
+                {
+                    UpdateLastMessage(topic, newTopic.LastMessage);
+                }
             }
             else
             {
@@ -446,7 +486,11 @@ namespace Telegram.Services
             }
             else
             {
-                _clientService.Send(new GetForumTopic(_chatId, message.TopicId()), UpdateNewTopic);
+                var topicId = message.TopicId();
+                if (topicId != 0)
+                {
+                    _clientService.Send(new GetForumTopic(_chatId, topicId), UpdateNewTopic);
+                }
             }
 
             if (message.SendingState is MessageSendingStatePending)
@@ -466,7 +510,10 @@ namespace Telegram.Services
                     _messages.Remove(topic.LastMessage.Id);
                 }
 
-                _messages[message.Id] = topic;
+                if (message != null)
+                {
+                    _messages[message.Id] = topic;
+                }
 
                 topic.LastMessage = message;
 
@@ -491,16 +538,16 @@ namespace Telegram.Services
                 {
                     if (topic.LastMessage?.Id == messageId)
                     {
+                        if (topic.LastMessage != null)
+                        {
+                            _messages.Remove(topic.LastMessage.Id);
+                        }
+
                         // Update last message
                         // Deliver update UpdateForumTopicLastMessage;
 
-                        _clientService.Send(new GetForumTopic(_chatId, topic.Info.MessageThreadId), response =>
+                        _clientService.Send(new GetForumTopic(_chatId, topic.Info.ForumTopicId), response =>
                         {
-                            if (topic.LastMessage != null)
-                            {
-                                _messages.Remove(topic.LastMessage.Id);
-                            }
-
                             var updatePinnedTopics = false;
                             var updateCurrentTopic = false;
 
@@ -531,7 +578,7 @@ namespace Telegram.Services
 
                             if (topic.LastMessage == null && topic.Order != 0)
                             {
-                                _clientService.Send(new GetForumTopic(_chatId, topic.Info.MessageThreadId), UpdateNewTopic);
+                                _clientService.Send(new GetForumTopic(_chatId, topic.Info.ForumTopicId), UpdateNewTopic);
                             }
 
                             if (updatePinnedTopics)
@@ -559,7 +606,7 @@ namespace Telegram.Services
 
         private Message MessageForumTopicCreated(ForumTopic topic)
         {
-            return new Message(topic.Info.MessageThreadId, topic.Info.CreatorId, _chatId, null, null, topic.Info.IsOutgoing, false, false, false, false, false, false, topic.Info.CreationDate, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, topic.Info.MessageThreadId, new MessageTopicForum(topic.Info.MessageThreadId), null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, new MessageForumTopicCreated(topic.Info.Name, topic.Info.Icon), null);
+            return new Message(topic.Info.MessageThreadId, topic.Info.CreatorId, _chatId, null, null, topic.Info.IsOutgoing, false, false, false, false, false, false, false, false, topic.Info.CreationDate, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, null, topic.Info.MessageThreadId, new MessageTopicForum(topic.Info.MessageThreadId), null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, new MessageForumTopicCreated(topic.Info.Name, topic.Info.Icon), null);
         }
 
         public void UpdateMessageSendSucceeded(Message message, long oldMessageId)
@@ -747,7 +794,7 @@ namespace Telegram.Services
 
 namespace Telegram.Td.Api
 {
-    public sealed class UpdateForumTopicLastMessage
+    public sealed partial class UpdateForumTopicLastMessage
     {
         public UpdateForumTopicLastMessage(long chatId, long messageThreadId, long order, Message lastMessage)
         {
@@ -774,7 +821,7 @@ namespace Telegram.Td.Api
         public Message LastMessage { get; set; }
     }
 
-    public sealed class UpdateForumTopicPosition
+    public sealed partial class UpdateForumTopicPosition
     {
         public UpdateForumTopicPosition(long chatId, long messageThreadId, long order)
         {
@@ -790,7 +837,7 @@ namespace Telegram.Td.Api
         public long Order { get; set; }
     }
 
-    public sealed class UpdateForumTopicReadInbox
+    public sealed partial class UpdateForumTopicReadInbox
     {
         public UpdateForumTopicReadInbox(long chatId, long messageThreadId, long lastReadInboxMessageId, int unreadCount)
         {
@@ -808,7 +855,7 @@ namespace Telegram.Td.Api
         public int UnreadCount { get; set; }
     }
 
-    public sealed class UpdateForumTopicReadOutbox
+    public sealed partial class UpdateForumTopicReadOutbox
     {
         public UpdateForumTopicReadOutbox(long chatId, long messageThreadId, long lastReadOutboxMessageId)
         {
@@ -824,7 +871,23 @@ namespace Telegram.Td.Api
         public long LastReadOutboxMessageId { get; set; }
     }
 
-    public sealed class UpdateForumTopicUnreadReactionCount
+    public sealed partial class UpdateForumTopicNotificationSettings
+    {
+        public UpdateForumTopicNotificationSettings(long chatId, long messageThreadId, ChatNotificationSettings notificationSettings)
+        {
+            ChatId = chatId;
+            MessageThreadId = messageThreadId;
+            NotificationSettings = notificationSettings;
+        }
+
+        public long ChatId { get; set; }
+
+        public long MessageThreadId { get; set; }
+
+        public ChatNotificationSettings NotificationSettings { get; set; }
+    }
+
+    public sealed partial class UpdateForumTopicUnreadReactionCount
     {
         public UpdateForumTopicUnreadReactionCount(long chatId, long messageThreadId, long unreadReactionCount)
         {
@@ -840,7 +903,7 @@ namespace Telegram.Td.Api
         public long UnreadReactionCount { get; set; }
     }
 
-    public sealed class UpdateForumTopicUnreadMentionCount
+    public sealed partial class UpdateForumTopicUnreadMentionCount
     {
         public UpdateForumTopicUnreadMentionCount(long chatId, long messageThreadId, long unreadMentionCount)
         {
@@ -856,7 +919,7 @@ namespace Telegram.Td.Api
         public long UnreadMentionCount { get; set; }
     }
 
-    public sealed class UpdateChatUnreadTopicCount
+    public sealed partial class UpdateChatUnreadTopicCount
     {
         public UpdateChatUnreadTopicCount(long chatId, int unreadTopicCount)
         {

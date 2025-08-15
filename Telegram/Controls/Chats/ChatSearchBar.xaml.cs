@@ -19,8 +19,6 @@ using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using static Telegram.Controls.Chats.ChatTextBox;
-using VirtualKey = Windows.System.VirtualKey;
-using VirtualKeyModifiers = Windows.System.VirtualKeyModifiers;
 
 namespace Telegram.Controls.Chats
 {
@@ -39,7 +37,7 @@ namespace Telegram.Controls.Chats
             {
                 if (Field.State != ChatSearchState.Members && !AutomationPeer.ListenerExists(AutomationEvents.LiveRegionChanged))
                 {
-                    ViewModel?.Search(Field.Text, Field.From, Field.Filter?.Filter, ViewModel.SavedMessagesTag);
+                    ViewModel?.Search(Field.Text, Field.From, ViewModel.SavedMessagesTag);
                 }
             };
         }
@@ -61,15 +59,13 @@ namespace Telegram.Controls.Chats
 
             Field.Text = viewModel?.Query ?? string.Empty;
             Field.From = viewModel?.From;
-            Field.Filter = null;
             Field.State = ChatSearchState.Text;
 
             if (viewModel != null)
             {
                 var history = viewModel.Dialog.Type is
                     not DialogType.History and
-                    not DialogType.Thread and
-                    not DialogType.SavedMessagesTopic;
+                    not DialogType.Thread;
 
                 SearchPrevious.Visibility = history ? Visibility.Collapsed : Visibility.Visible;
                 SearchNext.Visibility = history ? Visibility.Collapsed : Visibility.Visible;
@@ -248,24 +244,6 @@ namespace Telegram.Controls.Chats
 
                 photo.SetUser(ViewModel.ClientService, user, 32);
             }
-            else if (args.Item is ChatSearchMediaFilter filter)
-            {
-                var child = content.Children[0] as Border;
-                var glyph = child.Child as TextBlock;
-                var title = content.Children[1] as TextBlock;
-
-                glyph.Text = filter.Glyph;
-                title.Text = filter.Text;
-
-                if (filter.Filter is SearchMessagesFilterVideoNote)
-                {
-                    glyph.FontFamily = BootStrapper.Current.Resources["TelegramThemeFontFamily"] as FontFamily;
-                }
-                else
-                {
-                    glyph.FontFamily = BootStrapper.Current.Resources["SymbolThemeFontFamily"] as FontFamily;
-                }
-            }
 
             args.Handled = true;
         }
@@ -320,7 +298,7 @@ namespace Telegram.Controls.Chats
             if (e.Key == VirtualKey.Enter && modifiers == VirtualKeyModifiers.None && Field.State != ChatSearchState.Members)
             {
                 _debouncer.Cancel();
-                ViewModel?.Search(Field.Text, Field.From, Field.Filter?.Filter, ViewModel.SavedMessagesTag);
+                ViewModel?.Search(Field.Text, Field.From, ViewModel.SavedMessagesTag);
                 e.Handled = true;
             }
             else if (e.Key == VirtualKey.Enter && modifiers == VirtualKeyModifiers.Shift && Field.State != ChatSearchState.Members)
@@ -338,7 +316,7 @@ namespace Telegram.Controls.Chats
         private void Search_Click(object sender, RoutedEventArgs e)
         {
             _debouncer.Cancel();
-            ViewModel?.Search(Field.Text, Field.From, Field.Filter?.Filter, ViewModel.SavedMessagesTag);
+            ViewModel?.Search(Field.Text, Field.From, ViewModel.SavedMessagesTag);
         }
 
         private void Delete_Click(object sender, RoutedEventArgs e)
@@ -357,25 +335,15 @@ namespace Telegram.Controls.Chats
             Field.Focus(FocusState.Keyboard);
         }
 
-        private void FilterByMedia_Click(object sender, RoutedEventArgs e)
-        {
-            SetState(ChatSearchState.Media);
-            Field.Focus(FocusState.Keyboard);
-        }
-
         private void Autocomplete_ItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is User from)
             {
                 SetState(ChatSearchState.TextByMember, new MessageSenderUser(from.Id));
             }
-            else if (e.ClickedItem is ChatSearchMediaFilter filter)
-            {
-                SetState(ChatSearchState.TextByMedia, null, filter);
-            }
         }
 
-        private void SetState(ChatSearchState state, MessageSender from = null, ChatSearchMediaFilter filter = null)
+        private void SetState(ChatSearchState state, MessageSender from = null)
         {
             var viewModel = ViewModel;
             if (viewModel == null)
@@ -385,7 +353,6 @@ namespace Telegram.Controls.Chats
 
             if (from != null)
             {
-                Field.Filter = null;
                 Field.From = from;
 
                 if (viewModel.ClientService.TryGetUser(from, out User user))
@@ -400,9 +367,7 @@ namespace Telegram.Controls.Chats
             else
             {
                 Field.From = null;
-                Field.Filter = filter;
-
-                Field.Header = filter?.Text;
+                Field.Header = null;
             }
 
             Field.Text = string.Empty;
@@ -414,12 +379,7 @@ namespace Telegram.Controls.Chats
                     ToolsPanel.Visibility = Visibility.Collapsed;
                     viewModel.Autocomplete = new UsernameCollection(viewModel.ClientService, viewModel.Dialog.Chat.Id, 0, string.Empty, false, true, true);
                     break;
-                case ChatSearchState.Media:
-                    ToolsPanel.Visibility = Visibility.Collapsed;
-                    viewModel.Autocomplete = viewModel.Filters;
-                    break;
                 case ChatSearchState.TextByMember:
-                case ChatSearchState.TextByMedia:
                     ToolsPanel.Visibility = Visibility.Collapsed;
                     viewModel.Autocomplete = null;
                     break;
@@ -442,11 +402,7 @@ namespace Telegram.Controls.Chats
             {
                 SetState(ChatSearchState.Members);
             }
-            else if (Field.State == ChatSearchState.TextByMedia)
-            {
-                SetState(ChatSearchState.Media);
-            }
-            else if (Field.State is ChatSearchState.Members or ChatSearchState.Media)
+            else if (Field.State is ChatSearchState.Members)
             {
                 SetState(ChatSearchState.Text);
             }

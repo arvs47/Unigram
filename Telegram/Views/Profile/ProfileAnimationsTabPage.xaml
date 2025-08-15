@@ -12,7 +12,9 @@
 
     <Grid>
         <controls:SelectGridView x:Name="ScrollingHost"
-                                 ItemsSource="{x:Bind ViewModel.Animations, Mode=OneWay}"
+                                 ItemsSource="{x:Bind ViewModel.Animations.ItemsView, Mode=OneWay}"
+                                 IsItemClickEnabled="True"
+                                 ItemClick="OnItemClick"
                                  SelectionMode="None"
                                  ChoosingItemContainer="OnChoosingItemContainer"
                                  ContainerContentChanging="OnContainerContentChanging"
@@ -56,7 +58,7 @@
                 </Style>
             </GridView.ItemContainerStyle>
             <GridView.Header>
-                <Border Height="{x:Bind ViewModel.HeaderHeight, Mode=OneWay}" />
+                <Border x:Name="Header" />
             </GridView.Header>
             <GridView.Footer>
                 <Border Height="60" />
@@ -64,8 +66,7 @@
             <GridView.ItemTemplate>
                 <DataTemplate>
                     <Grid Background="{ThemeResource SettingsItemBackground}">
-                        <controls:ImageView Click="Photo_Click"
-                                            Stretch="UniformToFill" />
+                        <controls:ImageView Stretch="UniformToFill" />
 
                         <!--<controls:BadgeControl Text="00:08"
                                                Background="{ThemeResource MessageOverlayBackgroundBrush}"

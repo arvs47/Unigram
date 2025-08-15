@@ -47,8 +47,6 @@ namespace Telegram.ViewModels.Delegates
 
         void UpdateGroupCall(Chat chat, GroupCall groupCall);
 
-        void UpdateDeleteMessages(Chat chat, IList<MessageViewModel> messages);
-
 
 
         void PlayMessage(MessageViewModel message, FrameworkElement target);
@@ -69,10 +67,15 @@ namespace Telegram.ViewModels.Delegates
 
         void UpdateBubbleWithReplyToMessageId(long messageId, Action<MessageBubble, MessageViewModel> action);
 
+        void UpdateServiceWithForumTopic(long forumTopicId, Action<MessageService> action);
+
         void ForEach(Action<MessageBubble, MessageViewModel> action);
         void ForEach(Action<MessageBubble> action);
 
         bool HasContainerForItem(long id);
         SelectorItem ContainerFromItem(long id);
+
+        float AnimatedHeight { get; }
+        bool HasMessagesPadding { get; }
     }
 }

@@ -34,7 +34,6 @@ using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Navigation;
 using Windows.UI.Xaml.Shapes;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Views
 {
@@ -1115,7 +1114,7 @@ namespace Telegram.Views
             var galleryItem = new GalleryVideo(ViewModel.ClientService, block.Video, block.Caption.ToFormattedText());
             ViewModel.Gallery.Items.Add(galleryItem);
 
-            var message = CreateMessage(new MessageVideo(block.Video, Array.Empty<AlternativeVideo>(), null, 0, null, false, false, false));
+            var message = CreateMessage(new MessageVideo(block.Video, Array.Empty<AlternativeVideo>(), Array.Empty<VideoStoryboard>(), null, 0, null, false, false, false));
             var element = new StackPanel { Style = Resources["BlockVideoStyle"] as Style };
 
             var content = new VideoContent(message);
@@ -1178,7 +1177,7 @@ namespace Telegram.Views
 
             var view = new WebViewer();
 
-            async void loaded(object sender, RoutedEventArgs e)
+            void loaded(object sender, RoutedEventArgs e)
             {
                 view.Loaded -= loaded;
 
@@ -1261,7 +1260,7 @@ namespace Telegram.Views
                     var galleryItem = new GalleryVideo(ViewModel.ClientService, videoBlock.Video, block.Caption.ToFormattedText());
                     ViewModel.Gallery.Items.Add(galleryItem);
 
-                    var message = CreateMessage(new MessageVideo(videoBlock.Video, Array.Empty<AlternativeVideo>(), null, 0, null, false, false, false));
+                    var message = CreateMessage(new MessageVideo(videoBlock.Video, Array.Empty<AlternativeVideo>(), Array.Empty<VideoStoryboard>(), null, 0, null, false, false, false));
 
                     var content = new VideoContent(message);
                     content.Tag = galleryItem;
@@ -1304,7 +1303,7 @@ namespace Telegram.Views
                     var child = new ImageView();
                     //child.Source = (ImageSource)DefaultPhotoConverter.Convert(photoBlock.Photo, true);
                     //child.DataContext = galleryItem;
-                    child.Click += Image_Click;
+                    //child.Click += Image_Click;
                     child.Width = 72;
                     child.Height = 72;
                     child.Stretch = Stretch.UniformToFill;
@@ -1320,7 +1319,7 @@ namespace Telegram.Views
                     var child = new ImageView();
                     //child.Source = (ImageSource)DefaultPhotoConverter.Convert(videoBlock.Video, true);
                     //child.DataContext = galleryItem;
-                    child.Click += Image_Click;
+                    //child.Click += Image_Click;
                     child.Width = 72;
                     child.Height = 72;
                     child.Stretch = Stretch.UniformToFill;

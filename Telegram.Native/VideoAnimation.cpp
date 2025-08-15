@@ -110,19 +110,25 @@ namespace winrt::Telegram::Native::implementation
             }
             else
             {
-                info->file.ReadCallback(buf_size);
+                int64_t result;
+                info->file.ReadCallback(buf_size, result);
 
                 if (info->fd == INVALID_HANDLE_VALUE)
                 {
                     requestFd(info);
                 }
 
-                DWORD bytesRead;
-                DWORD moved = SetFilePointer(info->fd, info->file.Offset(), NULL, FILE_BEGIN);
-                BOOL result = ReadFile(info->fd, buf, buf_size, &bytesRead, NULL);
+                if (info->fd != INVALID_HANDLE_VALUE && result >= buf_size)
+                {
+                    DWORD bytesRead;
+                    DWORD moved = SetFilePointer(info->fd, info->file.Offset(), NULL, FILE_BEGIN);
+                    BOOL result = ReadFile(info->fd, buf, buf_size, &bytesRead, NULL);
 
-                info->file.SeekCallback(bytesRead + info->file.Offset());
-                return bytesRead == 0 ? AVERROR_EOF : bytesRead;
+                    info->file.SeekCallback(bytesRead + info->file.Offset());
+                    return bytesRead == 0 ? AVERROR_EOF : bytesRead;
+                }
+
+                return AVERROR_EOF;
             }
         }
         return 0;
@@ -160,6 +166,39 @@ namespace winrt::Telegram::Native::implementation
         CHAR buffer[1024];
         vsprintf_s(buffer, 1024, fmt, vargs);
         OutputDebugStringA(buffer);
+    }
+
+    static int get_stream_rotation(const AVStream* stream)
+    {
+        AVDictionaryEntry* e = av_dict_get(stream->metadata, "rotate", NULL, 0);
+        if (e && e->value)
+        {
+            if (!strcmp(e->value, "90") || !strcmp(e->value, "-270"))
+            {
+                return 90;
+            }
+            else if (!strcmp(e->value, "270") || !strcmp(e->value, "-90"))
+            {
+                return 270;
+            }
+            else if (!strcmp(e->value, "180") || !strcmp(e->value, "-180"))
+            {
+                return 180;
+            }
+            else if (!strcmp(e->value, "0"))
+            {
+                return 0;
+            }
+        }
+
+        const AVPacketSideData* displaymatrix = av_packet_side_data_get(
+            stream->codecpar->coded_side_data, stream->codecpar->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX);
+        if (displaymatrix)
+        {
+            return ((int)-av_display_rotation_get((int32_t*)displaymatrix->data) + 360) % 360;
+        }
+
+        return 0;
     }
 
     winrt::Telegram::Native::VideoAnimation VideoAnimation::LoadFromFile(IVideoAnimationSource file, bool preview, bool limitFps, bool probe)
@@ -245,22 +284,7 @@ namespace winrt::Telegram::Native::implementation
         {
             info->pixelWidth = info->video_dec_ctx->width;
             info->pixelHeight = info->video_dec_ctx->height;
-
-            //float pixelWidthHeightRatio = info->video_dec_ctx->sample_aspect_ratio.num / info->video_dec_ctx->sample_aspect_ratio.den; TODO support
-            AVDictionaryEntry* rotate_tag = av_dict_get(info->video_stream->metadata, "rotate", NULL, 0);
-            if (rotate_tag && *rotate_tag->value && strcmp(rotate_tag->value, "0"))
-            {
-                char* tail;
-                info->rotation = (int)av_strtod(rotate_tag->value, &tail);
-                if (*tail)
-                {
-                    info->rotation = 0;
-                }
-            }
-            else
-            {
-                info->rotation = 0;
-            }
+            info->rotation = get_stream_rotation(info->video_stream);
 
             if (info->video_stream->codecpar->codec_id == AV_CODEC_ID_H264)
             {
@@ -454,7 +478,7 @@ namespace winrt::Telegram::Native::implementation
         return nullptr;
     }
 
-    int VideoAnimation::RenderSync(IBuffer bitmap, int32_t w, int32_t h, bool preview, int32_t& seconds)
+    int VideoAnimation::RenderSync(IBuffer bitmap, int32_t w, int32_t h, bool preview, double& seconds)
     {
         uint8_t* pixels = bitmap.data();
         bool completed;
@@ -463,7 +487,7 @@ namespace winrt::Telegram::Native::implementation
         return result;
     }
 
-    int VideoAnimation::RenderSync(uint8_t* pixels, int32_t width, int32_t height, bool preview, int32_t& seconds, bool& completed)
+    int VideoAnimation::RenderSync(uint8_t* pixels, int32_t width, int32_t height, bool preview, double& seconds, bool& completed)
     {
         slim_lock_guard const guard(m_lock);
 
@@ -508,7 +532,7 @@ namespace winrt::Telegram::Native::implementation
 
                     //if (nextFrame >= prevFrame + 1.0 / 30 || framerate < 60)
                     {
-                        seconds = static_cast<int32_t>(nextFrame);
+                        seconds = nextFrame;
                         prevFrame = nextFrame;
 
                         decode_frame(pixels, width, height);

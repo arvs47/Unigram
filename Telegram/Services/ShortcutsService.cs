@@ -12,16 +12,15 @@ using Telegram.Collections;
 using Telegram.Navigation;
 using Windows.Data.Json;
 using Windows.Storage;
-using Windows.System;
 using Windows.UI.Xaml.Input;
 
 namespace Telegram.Services
 {
     public interface IShortcutsService
     {
-        InvokedShortcut Process(ProcessKeyboardAcceleratorEventArgs args);
+        InvokedShortcut Process(KeyRoutedEventArgs args);
 
-        bool TryGetShortcut(ProcessKeyboardAcceleratorEventArgs args, out Shortcut shortcut);
+        bool TryGetShortcut(KeyRoutedEventArgs args, out Shortcut shortcut);
 
         IList<ShortcutList> GetShortcuts();
         IList<ShortcutList> Update(Shortcut shortcut, ShortcutCommand command);
@@ -184,14 +183,14 @@ namespace Telegram.Services
             InitializeCustom();
         }
 
-        public InvokedShortcut Process(ProcessKeyboardAcceleratorEventArgs args)
+        public InvokedShortcut Process(KeyRoutedEventArgs args)
         {
             if (args.Key is >= VirtualKey.NumberPad0 and <= VirtualKey.NumberPad9)
             {
-                return Process(args.Modifiers, VirtualKey.Number0 + (args.Key - VirtualKey.NumberPad0));
+                return Process(WindowContext.KeyModifiers(), VirtualKey.Number0 + (args.Key - VirtualKey.NumberPad0));
             }
 
-            return Process(args.Modifiers, args.Key);
+            return Process(WindowContext.KeyModifiers(), args.Key);
         }
 
         private InvokedShortcut Process(VirtualKeyModifiers modifiers, VirtualKey key)
@@ -211,9 +210,9 @@ namespace Telegram.Services
         //int nonVirtualKey = MapVirtualKey((uint)args.VirtualKey, 2);
         //char mappedChar = Convert.ToChar(nonVirtualKey);
 
-        public bool TryGetShortcut(ProcessKeyboardAcceleratorEventArgs args, out Shortcut shortcut)
+        public bool TryGetShortcut(KeyRoutedEventArgs args, out Shortcut shortcut)
         {
-            return TryGetShortcut(args.Modifiers, args.Key, out shortcut);
+            return TryGetShortcut(WindowContext.KeyModifiers(), args.Key, out shortcut);
         }
 
         private bool TryGetShortcut(VirtualKeyModifiers modifiers, VirtualKey key, out Shortcut shortcut)
@@ -544,6 +543,46 @@ namespace Telegram.Services
 
             return null;
         }
+
+        public static string GetStringRepresentation(VirtualKey key, VirtualKeyModifiers modifiers = VirtualKeyModifiers.None)
+        {
+            var builder = new StringBuilder();
+
+            static void ConcatVirtualKey(VirtualKey key, StringBuilder builder)
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append("+");
+                }
+
+                builder.Append(key switch
+                {
+                    VirtualKey.Control => Strings.VirtualKeyModifiersControl,
+                    VirtualKey.Menu => Strings.VirtualKeyModifiersMenu,
+                    VirtualKey.Shift => Strings.VirtualKeyModifiersShift,
+                    (VirtualKey)190 => '.',
+                    _ => key.ToString()
+                });
+            }
+
+            if ((modifiers & VirtualKeyModifiers.Control) != 0)
+            {
+                ConcatVirtualKey(VirtualKey.Control, builder);
+            }
+
+            if ((modifiers & VirtualKeyModifiers.Menu) != 0)
+            {
+                ConcatVirtualKey(VirtualKey.Menu, builder);
+            }
+
+            if ((modifiers & VirtualKeyModifiers.Shift) != 0)
+            {
+                ConcatVirtualKey(VirtualKey.Shift, builder);
+            }
+
+            ConcatVirtualKey(key, builder);
+            return builder.ToString();
+        }
     }
 
     public sealed partial class ShortcutList : KeyedList<string, ShortcutInfo>
@@ -603,8 +642,7 @@ namespace Telegram.Services
 
         public override int GetHashCode()
         {
-            return Modifiers.GetHashCode()
-                ^ Key.GetHashCode();
+            return HashCode.Combine(Modifiers, Key);
         }
 
         public override string ToString()
@@ -627,24 +665,18 @@ namespace Telegram.Services
         private string[] GetComponents()
         {
             var parts = new List<string>();
-            var modifiers = Enum.GetValues(typeof(VirtualKeyModifiers))
-                .Cast<VirtualKeyModifiers>()
-                .Where(v => v != VirtualKeyModifiers.None && Modifiers.HasFlag(v));
 
-            foreach (var key in modifiers)
+            if (Modifiers.HasFlag(VirtualKeyModifiers.Control))
             {
-                switch (key)
-                {
-                    case VirtualKeyModifiers.Control:
-                        parts.Add("Ctrl");
-                        break;
-                    case VirtualKeyModifiers.Menu:
-                        parts.Add("Alt");
-                        break;
-                    case VirtualKeyModifiers.Shift:
-                        parts.Add("Shift");
-                        break;
-                }
+                parts.Add("Ctrl");
+            }
+            if (Modifiers.HasFlag(VirtualKeyModifiers.Menu))
+            {
+                parts.Add("Alt");
+            }
+            if (Modifiers.HasFlag(VirtualKeyModifiers.Shift))
+            {
+                parts.Add("Shift");
             }
 
             if (Key is >= VirtualKey.Number0 and <= VirtualKey.Number9)

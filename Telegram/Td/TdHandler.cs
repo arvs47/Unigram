@@ -5,24 +5,27 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 using System;
-using Telegram.Td.Api;
 
 namespace Telegram.Td
 {
-    class TdHandler : ClientResultHandler
+    partial class TdHandler : ClientResultHandler
     {
-        private readonly Action<BaseObject> _callback;
+        private readonly Action<Object> _callback;
 
-        public TdHandler(Action<BaseObject> callback)
+        public TdHandler(Action<Object> callback)
         {
             _callback = callback;
         }
 
+#if TD_CX
         public void OnResult(BaseObject result)
+#else
+        public void OnResult(Object result)
+#endif
         {
             try
             {
-                _callback(result);
+                _callback(result as Object);
             }
             catch
             {

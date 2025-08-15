@@ -23,12 +23,14 @@ namespace Telegram.Views
         private readonly IPasscodeService _passcode;
         private readonly ILocaleService _locale;
         private readonly IPlaybackService _playback;
+        private readonly VoipCoordinator _voip;
 
         private TypeResolver()
         {
             _lifetime = new LifetimeService();
             _passcode = new PasscodeService(SettingsService.Current.PasscodeLock);
             _playback = new PlaybackService(SettingsService.Current);
+            _voip = new VoipCoordinator();
             _locale = LocaleService.Current;
         }
 
@@ -108,6 +110,7 @@ namespace Telegram.Views
         public IPasscodeService Passcode => _passcode;
         public ILocaleService Locale => _locale;
         public IPlaybackService Playback => _playback;
+        public VoipCoordinator Voip => _voip;
 
         public static TypeResolver Current
         {
@@ -139,7 +142,7 @@ namespace Telegram.Views
 
         public TypeLocator Build(int id)
         {
-            return _containers[id] = new TypeLocator(_lifetime, _locale, _passcode, _playback, id, id == SettingsService.Current.ActiveSession);
+            return _containers[id] = new TypeLocator(_lifetime, _locale, _passcode, id, id == SettingsService.Current.ActiveSession);
         }
 
         public void Destroy(int id)

@@ -77,16 +77,16 @@ namespace Telegram.Streams
             _offset = offset;
         }
 
-        public override void ReadCallback(long count)
+        public override void ReadCallback(long count, out long bytesRead)
         {
-            // Nothing
+            bytesRead = count;
         }
 
         public override bool Equals(object obj)
         {
             if (obj is LocalFileSource y && !y.IsUnique && !IsUnique)
             {
-                return y.FilePath == FilePath;
+                return y.FilePath == FilePath && y.IsAnimated == IsAnimated;
             }
 
             return base.Equals(obj);
@@ -99,7 +99,7 @@ namespace Telegram.Streams
                 return base.GetHashCode();
             }
 
-            return FilePath.GetHashCode();
+            return HashCode.Combine(FilePath, IsAnimated);
         }
     }
 }

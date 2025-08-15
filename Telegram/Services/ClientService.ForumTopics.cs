@@ -1,4 +1,10 @@
-﻿using System;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -99,18 +105,20 @@ namespace Telegram.Services
             return 0;
         }
 
-        private void UpdateForumTopic(long chatId, Action<ForumTopicService> update)
+        private void UpdateForumTopic(long chatId, bool createNew, Action<ForumTopicService> update)
         {
             if (_forums.TryGetValue(chatId, out ForumTopicService manager))
             {
                 update(manager);
             }
-            else
+            else if (createNew)
             {
-                //manager = new ForumTopicService(this, _aggregator, chatId);
-                //_forums[chatId] = manager;
+                manager = new ForumTopicService(this, _aggregator, chatId);
+                _forums[chatId] = manager;
 
-                //update(manager);
+                //manager.GetForumTopicsAsync(0, 20);
+
+                update(manager);
             }
         }
 
@@ -123,12 +131,12 @@ namespace Telegram.Services
                     var manager = new ForumTopicService(this, _aggregator, chat.Id);
                     _forums[chat.Id] = manager;
 
-                    manager.GetForumTopicsAsync(0, 20);
+                    //manager.GetForumTopicsAsync(0, 20);
                 }
-                else if (supergroup.IsFeedbackGroup && !_feedbackChats.ContainsKey(chat.Id))
+                else if (supergroup.IsDirectMessagesGroup && !_directMessagesChats.ContainsKey(chat.Id))
                 {
-                    var manager = new FeedbackChatTopicService(this, _aggregator, chat.Id);
-                    _feedbackChats[chat.Id] = manager;
+                    var manager = new DirectMessagesChatTopicService(this, _aggregator, chat.Id);
+                    _directMessagesChats[chat.Id] = manager;
                 }
             }
         }

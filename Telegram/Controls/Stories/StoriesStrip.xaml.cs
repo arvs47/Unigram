@@ -1,4 +1,10 @@
-﻿using System;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using System;
 using System.Collections.Specialized;
 using System.Numerics;
 using Telegram.Common;
@@ -15,7 +21,6 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Input;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Controls.Stories
 {
@@ -209,13 +214,7 @@ namespace Telegram.Controls.Stories
             }
             else if (ViewModel.IsPremiumAvailable && !ViewModel.IsPremium)
             {
-                var popup = new Telegram.Views.Premium.Popups.FeaturesPopup(ViewModel.ClientService, null, new[] { new PremiumFeatureUpgradedStories() }, null, null, null, null, new PremiumFeatureUpgradedStories());
-                await ViewModel.ShowPopupAsync(popup);
-
-                if (popup.ShouldPurchase)
-                {
-                    await ViewModel.NavigationService.ShowPromoAsync(new PremiumSourceStoryFeature(new PremiumStoryFeatureStealthMode()));
-                }
+                ViewModel.NavigationService.ShowPromo(new PremiumFeatureUpgradedStories(), new PremiumSourceStoryFeature(new PremiumStoryFeatureStealthMode()));
             }
         }
 
@@ -703,9 +702,9 @@ namespace Telegram.Controls.Stories
             _collapsed = true;
             Collapsing?.Invoke(this, EventArgs.Empty);
 
-            ControlledList.Padding = new Thickness(0, 0, 0, 0);
+            ControlledList.Padding = new Thickness(0);
             _progressAnimation.Properties.InsertBoolean("Collapsed", true);
-            _scrollViewer.SetVerticalPadding(0);
+            _scrollViewer.SetVerticalPadding(0, 0);
 
             UpdateMinHeight();
             UpdateIndexes();
@@ -760,7 +759,7 @@ namespace Telegram.Controls.Stories
 
             ControlledList.Padding = new Thickness(0, 88, 0, 0);
             _progressAnimation.Properties.InsertBoolean("Collapsed", false);
-            _scrollViewer.SetVerticalPadding(88);
+            _scrollViewer.SetVerticalPadding(88, 0);
 
             UpdateMinHeight();
             UpdateIndexes();

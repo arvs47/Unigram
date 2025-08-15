@@ -1,10 +1,15 @@
-﻿using System;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using System;
 using Telegram.Collections;
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
-using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Telegram.ViewModels.Stories;
 using Telegram.Views.Create;

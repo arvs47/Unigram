@@ -6,7 +6,6 @@
 //
 using System;
 using System.Collections.Generic;
-using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Cells.Premium;
 using Telegram.Services;
@@ -81,11 +80,6 @@ namespace Telegram.Views.Premium.Popups
             {
                 businessCell.UpdateFeature(_clientService, _businessFeatures);
             }
-        }
-
-        private void PurchaseShadow_Loaded(object sender, RoutedEventArgs e)
-        {
-            VisualUtilities.DropShadow(PurchaseShadow);
         }
 
         private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)

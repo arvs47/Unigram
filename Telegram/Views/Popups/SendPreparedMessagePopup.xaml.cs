@@ -1,4 +1,10 @@
-﻿using Telegram.Controls;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using Telegram.Controls;
 using Telegram.Navigation.Services;
 using Telegram.Services;
 using Telegram.Td.Api;
@@ -24,11 +30,10 @@ namespace Telegram.Views.Popups
             message.IsOutgoing = false;
             clientService.TryGetChatFromUser(clientService.Options.MyId, out Chat chat);
 
-            var playback = TypeResolver.Current.Playback;
             var settings = TypeResolver.Current.Resolve<ISettingsService>(clientService.SessionId);
 
             var delegato = new ChatMessageDelegate(clientService, settings, chat);
-            var viewModel = new MessageViewModel(clientService, playback, delegato, chat, null, message, true);
+            var viewModel = new MessageViewModel(clientService, delegato, chat, null, null, message, true);
 
             BackgroundControl.Update(clientService, null);
             Message.UpdateMessage(viewModel);

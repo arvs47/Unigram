@@ -10,10 +10,10 @@ using Telegram.Common;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
-using Telegram.ViewModels.Delegates;
 using Telegram.ViewModels.Gallery;
 using Telegram.Views;
 using Windows.Foundation;
+using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Hosting;
@@ -24,7 +24,7 @@ namespace Telegram.Controls.Gallery
 {
     public sealed partial class GalleryContent : AspectView
     {
-        private IGalleryDelegate _delegate;
+        private GalleryWindow _window;
         private GalleryMedia _item;
 
         private int _itemId;
@@ -68,7 +68,7 @@ namespace Telegram.Controls.Gallery
             {
                 UpdateManager.Unsubscribe(this, ref _fileToken);
 
-                _delegate.ClientService?.Send(new OpenMessageContent(message.ChatId, message.Id));
+                _window.ClientService?.Send(new OpenMessageContent(message.ChatId, message.Id));
             }
         }
 
@@ -145,9 +145,9 @@ namespace Telegram.Controls.Gallery
             }
         }
 
-        public void UpdateItem(IGalleryDelegate delegato, GalleryMedia item)
+        public void UpdateItem(GalleryWindow window, GalleryMedia item)
         {
-            _delegate = delegato;
+            _window = window;
             _item = item;
 
             _appliedRotation = item?.RotationAngle switch
@@ -208,8 +208,15 @@ namespace Telegram.Controls.Gallery
                 UpdateThumbnail(item, thumbnail, null, true);
             }
 
-            UpdateManager.Subscribe(this, delegato.ClientService, file, ref _fileToken, UpdateFile);
+            UpdateManager.Subscribe(this, window.ClientService, file, ref _fileToken, UpdateFile);
             UpdateFile(item, file);
+
+            if (item.AlternativeVideos.Count > 0)
+            {
+                var video = item.AlternativeVideos[0];
+                window.ClientService.DownloadFile(video.HlsFile.Id, 30);
+                window.ClientService.DownloadFile(video.Video.Id, 29, 0, (int)((double)video.Video.Size / item.Duration));
+            }
         }
 
         private void UpdateFile(object target, File file)
@@ -246,7 +253,7 @@ namespace Telegram.Controls.Gallery
 
                 if (item.IsPhoto && item.IsMedia)
                 {
-                    item.ClientService.DownloadFile(file.Id, 1);
+                    item.ClientService.DownloadFile(file.Id, 16);
                 }
             }
             else
@@ -262,7 +269,16 @@ namespace Telegram.Controls.Gallery
                     Button.SetGlyph(file.Id, MessageContentState.Photo);
                     Button.Opacity = 0;
 
-                    Texture.Source = UriEx.ToBitmap(file.Local.Path, 0, 0);
+                    if (Extensions.IsRelativePath(ApplicationData.Current.LocalFolder.Path, file.Local.Path, out _))
+                    {
+                        Texture.Source = UriEx.ToBitmap(file.Local.Path, 0, 0);
+                    }
+                    else
+                    {
+                        var bitmap = new BitmapImage();
+                        Texture.Source = bitmap;
+                        UpdateBitmap(bitmap, file.Local.Path);
+                    }
                 }
                 else
                 {
@@ -274,6 +290,22 @@ namespace Telegram.Controls.Gallery
 
             Canvas.SetZIndex(Button,
                 Button.State == MessageContentState.Photo ? -1 : 0);
+        }
+
+        private async void UpdateBitmap(BitmapImage bitmap, string path)
+        {
+            try
+            {
+                var file = await StorageFile.GetFileFromPathAsync(path);
+                using (var stream = await file.OpenReadAsync())
+                {
+                    await bitmap.SetSourceAsync(stream);
+                }
+            }
+            catch
+            {
+                //
+            }
         }
 
         private void UpdateThumbnail(object target, File file)
@@ -315,10 +347,10 @@ namespace Telegram.Controls.Gallery
                     {
                         if (file.Local.CanBeDownloaded && !file.Local.IsDownloadingActive)
                         {
-                            _delegate.ClientService.DownloadFile(file.Id, 1);
+                            _window.ClientService.DownloadFile(file.Id, 1);
                         }
 
-                        UpdateManager.Subscribe(this, _delegate.ClientService, file, ref _thumbnailToken, UpdateThumbnail, true);
+                        UpdateManager.Subscribe(this, _window.ClientService, file, ref _thumbnailToken, UpdateThumbnail, true);
                     }
 
                     if (minithumbnail != null)
@@ -353,13 +385,13 @@ namespace Telegram.Controls.Gallery
 
             if (file.Local.IsDownloadingActive)
             {
-                item.ClientService.Send(new CancelDownloadFile(file.Id, false));
+                item.ClientService.CancelDownloadFile(file, false);
             }
             else if (file.Local.CanBeDownloaded && !file.Local.IsDownloadingActive && !file.Local.IsDownloadingCompleted)
             {
                 if (SettingsService.Current.IsStreamingEnabled && item.IsVideo && item.IsStreamable)
                 {
-                    _delegate?.OpenFile(item, file);
+                    _window?.OpenFile(item, file);
                 }
                 else
                 {
@@ -368,11 +400,11 @@ namespace Telegram.Controls.Gallery
             }
             else if (item.IsVideo)
             {
-                _delegate?.OpenFile(item, file);
+                _window?.OpenFile(item, file);
             }
             else if (item is GalleryMessage message && !item.IsMedia)
             {
-                var service = TypeResolver.Current.Resolve<IStorageService>(_delegate.ClientService.SessionId);
+                var service = TypeResolver.Current.Resolve<IStorageService>(_window.ClientService.SessionId);
                 if (service != null)
                 {
                     _ = service.OpenFileAsync(file);
@@ -404,7 +436,10 @@ namespace Telegram.Controls.Gallery
 
                 _fileId = file.Id;
 
-                TypeResolver.Current.Playback.Pause();
+                if (!item.IsLoopingEnabled)
+                {
+                    TypeResolver.Current.Playback.Pause();
+                }
 
                 // Always recreate HLS player for now, try to reuse native one
                 if ((SettingsService.Current.Diagnostics.ForceWebView2 || item.IsHls()) && ChromiumWebPresenter.IsSupported())
@@ -513,9 +548,10 @@ namespace Telegram.Controls.Gallery
 
         private void OnTrackChanged(VideoPlayerBase sender, VideoPlayerTrackChangedEventArgs args)
         {
-            if (args.Width != 0 && args.Height != 0)
+            if (args.Width != 0 && args.Height != 0 && !ActualConstraint.IsEmpty)
             {
-                Constraint = new MaximumSize(args.Width, args.Height);
+                var size = ImageHelper.ScaleMin(args.Width, args.Height, Math.Max(ActualConstraint.Width, ActualConstraint.Height));
+                Constraint = new MaximumSize(size.Width, size.Height);
             }
         }
 
@@ -529,12 +565,23 @@ namespace Telegram.Controls.Gallery
             }
         }
 
-        public void Stop(out int fileId, out double position)
+        public void Stop(out GalleryMedia item, out double position)
         {
             if (Video != null && !_unloaded)
             {
-                fileId = _fileId;
-                position = Video.Position;
+                item = _item;
+
+                var time = Video.Position;
+                var length = Video.Duration;
+
+                if (length >= 30 && time >= 10 && time <= length - 10)
+                {
+                    position = time;
+                }
+                else
+                {
+                    position = 0;
+                }
 
                 _stopped = true;
                 Video.Stop();
@@ -542,7 +589,7 @@ namespace Telegram.Controls.Gallery
             }
             else
             {
-                fileId = 0;
+                item = null;
                 position = 0;
             }
 

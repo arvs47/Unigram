@@ -9,8 +9,7 @@ using System.Collections.Generic;
 using Telegram.Controls;
 using Telegram.Controls.Drawers;
 using Telegram.Navigation;
-using Windows.Foundation;
-using Windows.System;
+using Telegram.Services;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -406,7 +405,7 @@ namespace Telegram.Common
 
             if (key.HasValue)
             {
-                flyoutItem.KeyboardAccelerators.Add(new KeyboardAccelerator { Modifiers = modifiers, Key = key.Value, IsEnabled = false });
+                flyoutItem.KeyboardAcceleratorTextOverride = ShortcutsService.GetStringRepresentation(key.Value, modifiers);
             }
 
             items.Add(flyoutItem);

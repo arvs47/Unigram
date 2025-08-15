@@ -188,6 +188,8 @@
                                                       Grid.Row="1">
                                 <controls:FormattedTextBlock x:Name="Message"
                                                              Foreground="{ThemeResource MessageForegroundBrush}"
+                                                             HorizontalTextAlignment="DetectFromContent"
+                                                             TextReadingOrder="UseFlowDirection"
                                                              AdjustLineEnding="True"
                                                              Margin="10,0,10,6"
                                                              Grid.Column="1"
@@ -284,20 +286,22 @@
                                              Foreground="{ThemeResource MessageHeaderForegroundBrush}"
                                              HorizontalAlignment="Stretch"
                                              HorizontalContentAlignment="Stretch"
+                                             BorderThickness="0"
                                              Padding="0"
                                              Grid.Column="1"
                                              Grid.Row="2">
                                 <Grid BorderBrush="{ThemeResource TelegramSeparatorMediumBrush}"
                                       BorderThickness="0,1,0,0"
-                                      Padding="10,4,10,4">
+                                      Padding="10,4,10,6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <!-- TODO: Migrate to RecentUserHeads -->
-                                    <StackPanel x:Name="RecentRepliers"
-                                                Orientation="Horizontal"
-                                                Height="28" />
+                                    <controls:RecentUserHeads x:Name="RecentRepliers"
+                                                              BorderBrush="{ThemeResource MessageBackgroundBrush}"
+                                                              ItemSize="24"
+                                                              ItemOverlap="12" />
                                     <TextBlock x:Name="ThreadGlyph"
                                                Text="&#xE9BF;"
                                                FontFamily="{StaticResource SymbolThemeFontFamily}"
@@ -313,16 +317,17 @@
                                                HorizontalAlignment="Right"
                                                VerticalAlignment="Center"
                                                FontSize="20"
-                                               Grid.Column="1" />
+                                               Grid.Column="2" />
                                 </Grid>
                             </HyperlinkButton>
                         </Grid>
 
-                        <controls:ReplyMarkupPanel x:Name="Markup"
-                                                   x:Load="False"
-                                                   MaxWidth="{StaticResource MessageMaxWidth}"
-                                                   Grid.Column="1"
-                                                   Grid.Row="1" />
+                        <local:ReplyMarkupInlinePanel x:Name="Markup"
+                                                      x:Load="False"
+                                                      MaxWidth="{StaticResource MessageMaxWidth}"
+                                                      Background="{ThemeResource MessageServiceBackgroundBrush}"
+                                                      Grid.Column="1"
+                                                      Grid.Row="1" />
 
 
                         <!-- TODO: find a way to get rid of this -->

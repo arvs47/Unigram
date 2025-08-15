@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Common
 {
@@ -171,6 +170,41 @@ namespace Telegram.Common
             }
         }
 
+        public static async Task WaitForViewChangedAsync(this ScrollViewer scrollViewer, bool updateLayout)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+
+            void layoutUpdated(object s1, object e1)
+            {
+                tcs.TrySetResult(true);
+            }
+
+            void viewChanged(object s, ScrollViewerViewChangedEventArgs e)
+            {
+                if (e.IsIntermediate)
+                {
+                    return;
+                }
+
+                scrollViewer.LayoutUpdated += layoutUpdated;
+
+                if (updateLayout)
+                {
+                    scrollViewer.UpdateLayout();
+                }
+            }
+            try
+            {
+                scrollViewer.ViewChanged += viewChanged;
+                await tcs.Task;
+            }
+            finally
+            {
+                scrollViewer.ViewChanged -= viewChanged;
+                scrollViewer.LayoutUpdated -= layoutUpdated;
+            }
+        }
+
         public static ScrollViewer GetScrollViewer(this ListViewBase listViewBase)
         {
             //if (listViewBase is ChatsListView bubble)
@@ -192,12 +226,12 @@ namespace Telegram.Common
             return false;
         }
 
-        public static void SetVerticalPadding(this ScrollViewer scrollViewer, double padding)
+        public static void SetVerticalPadding(this ScrollViewer scrollViewer, double top, double bottom)
         {
-            var scrollBar = scrollViewer.GetChild<ScrollBar>(x => x.Orientation == Orientation.Vertical);
+            var scrollBar = scrollViewer?.GetLastChild<ScrollBar>(x => x.Orientation == Orientation.Vertical);
             if (scrollBar != null)
             {
-                scrollBar.Margin = new Thickness(0, padding, 0, 0);
+                scrollBar.Margin = new Thickness(0, top, 0, bottom);
             }
         }
 

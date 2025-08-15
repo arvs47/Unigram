@@ -35,7 +35,7 @@ namespace Telegram.Entities
             //ItemDate = basic.ItemDate;
             Size = fileSize;
 
-            EditState = new BitmapEditState();
+            EditState = new ImageGeneration();
         }
 
         public StorageFile File { get; private set; }
@@ -80,8 +80,13 @@ namespace Telegram.Entities
         {
             get
             {
-                if (_editState is BitmapEditState editState && !editState.IsEmpty)
+                if (_editState is ImageGeneration editState && !editState.IsEmpty)
                 {
+                    if (editState.Rotation is ImageRotation.Clockwise90Degrees or ImageRotation.Clockwise270Degrees)
+                    {
+                        return editState.Rectangle.Height * Height;
+                    }
+
                     return editState.Rectangle.Width * Width;
                 }
 
@@ -93,17 +98,22 @@ namespace Telegram.Entities
         {
             get
             {
-                if (_editState is BitmapEditState editState && !editState.IsEmpty)
+                if (_editState is ImageGeneration editState && !editState.IsEmpty)
                 {
-                    return editState.Rectangle.Height * Height;
+                    if (editState.Rotation is ImageRotation.Clockwise90Degrees or ImageRotation.Clockwise270Degrees)
+                    {
+                        return editState.Rectangle.Height * Height;
+                    }
+
+                    return editState.Rectangle.Width * Width;
                 }
 
                 return Height;
             }
         }
 
-        protected BitmapEditState _editState;
-        public BitmapEditState EditState
+        protected ImageGeneration _editState;
+        public ImageGeneration EditState
         {
             get => _editState;
             set
@@ -117,37 +127,53 @@ namespace Telegram.Entities
 
         public virtual async void Refresh()
         {
-            if (_editState is BitmapEditState editState && !editState.IsEmpty)
+            if (_editState is ImageGeneration editState && !editState.IsEmpty)
             {
                 try
                 {
-                    _preview = await ImageHelper.CropAndPreviewAsync(this, editState);
+                    // TODO: actual logical pixel size
+                    _preview = await ImageHelper.CropAndPreviewAsync(this, editState, 600);
                 }
                 catch
                 {
-                    try
-                    {
-                        _preview = await ImageHelper.GetPreviewBitmapAsync(this);
-                    }
-                    catch
-                    {
-                        _preview = new BitmapImage();
-                    }
+                    await RefreshAsync();
                 }
             }
             else
             {
-                try
-                {
-                    _preview = await ImageHelper.GetPreviewBitmapAsync(this);
-                }
-                catch
-                {
-                    _preview = new BitmapImage();
-                }
+                await RefreshAsync();
             }
 
             RaisePropertyChanged(nameof(Preview));
+        }
+
+        private async Task RefreshAsync()
+        {
+            try
+            {
+                if (this is StorageVideo)
+                {
+                    // TODO: actual logical pixel size
+                    _preview = await ImageHelper.GetPreviewBitmapAsync(this, 600);
+                }
+                else
+                {
+                    var preview = new BitmapImage
+                    {
+                        DecodePixelWidth = 300,
+                        DecodePixelType = DecodePixelType.Logical
+                    };
+
+                    using var stream = await File.OpenReadAsync();
+                    await preview.SetSourceAsync(stream);
+
+                    _preview = preview;
+                }
+            }
+            catch
+            {
+                _preview = new BitmapImage();
+            }
         }
 
         public static async Task<StorageMedia> CreateAsync(StorageFile file, bool probe = true)

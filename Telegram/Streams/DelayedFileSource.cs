@@ -125,7 +125,7 @@ namespace Telegram.Streams
                 };
             }
 
-            if (stickerSet.Covers?.Count > 0)
+            if (stickerSet?.Covers?.Count > 0)
             {
                 return DelayedFileSource.FromSticker(clientService, stickerSet.Covers[0]);
             }
@@ -159,7 +159,7 @@ namespace Telegram.Streams
             }
         }
 
-        private void OutlineRequested(BaseObject response)
+        private void OutlineRequested(Object response)
         {
             if (response is Outline outline)
             {
@@ -203,7 +203,7 @@ namespace Telegram.Streams
         {
             if (obj is DelayedFileSource y && !y.IsUnique && !IsUnique)
             {
-                return y.Id == Id;
+                return y.Id == Id && y.IsAnimated == IsAnimated;
             }
 
             return base.Equals(obj);
@@ -216,7 +216,7 @@ namespace Telegram.Streams
                 return base.GetHashCode();
             }
 
-            return Id.GetHashCode();
+            return HashCode.Combine(Id, IsAnimated);
         }
     }
 }

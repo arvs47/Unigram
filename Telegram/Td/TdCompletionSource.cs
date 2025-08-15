@@ -6,23 +6,26 @@
 //
 using System;
 using System.Threading.Tasks;
-using Telegram.Td.Api;
 
 namespace Telegram.Td
 {
-    class TdCompletionSource : TaskCompletionSource<BaseObject>, ClientResultHandler
+    partial class TdCompletionSource : TaskCompletionSource<Object>, ClientResultHandler
     {
-        private readonly Action<BaseObject> _closure;
+        private readonly Action<Object> _closure;
 
-        public TdCompletionSource(Action<BaseObject> closure)
+        public TdCompletionSource(Action<Object> closure)
         {
             _closure = closure;
         }
 
+#if TD_CX
         public void OnResult(BaseObject result)
+#else
+        public void OnResult(Object result)
+#endif
         {
-            _closure(result);
-            SetResult(result);
+            _closure(result as Object);
+            SetResult(result as Object);
         }
     }
 }

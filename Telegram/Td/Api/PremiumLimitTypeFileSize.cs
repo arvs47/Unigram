@@ -8,9 +8,14 @@ namespace Telegram.Td.Api
 {
     public partial class PremiumLimitTypeFileSize : PremiumLimitType
     {
+        public override string ToString()
+        {
+            return nameof(PremiumLimitTypeFileSize);
+        }
+
         public NativeObject ToUnmanaged()
         {
-            throw new System.NotImplementedException();
+            return null;
         }
     }
 }

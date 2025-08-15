@@ -13,6 +13,7 @@ using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Windows.Foundation;
+using Windows.UI.Xaml.Controls;
 using WM = Windows.Media;
 
 namespace Telegram.Services
@@ -60,6 +61,9 @@ namespace Telegram.Services
 
         void Play(MessageWithOwner message, MessageTopic topic = null);
 
+        void Attach(SwapChainPanel panel);
+        void Detach(SwapChainPanel panel);
+
         TimeSpan Position { get; }
         TimeSpan Duration { get; }
 
@@ -92,6 +96,8 @@ namespace Telegram.Services
 
         private WM.SystemMediaTransportControls _transport;
 
+        private int _sessionId;
+        private long _chatId;
         private MessageTopic _topic;
 
         private List<PlaybackItem> _items;
@@ -582,7 +588,7 @@ namespace Telegram.Services
             }
 
             var previous = _items;
-            if (previous != null && _topic.AreTheSame(topic))
+            if (previous != null && _sessionId == message.ClientService.SessionId && _chatId == message.ChatId && _topic.AreTheSame(topic))
             {
                 var already = previous.FirstOrDefault(x => x.Message.Id == message.Id && x.Message.ChatId == message.ChatId);
                 if (already != null)
@@ -598,6 +604,9 @@ namespace Telegram.Services
             var items = _items = new List<PlaybackItem>();
 
             _items.Add(item);
+
+            _sessionId = message.ClientService.SessionId;
+            _chatId = message.ChatId;
             _topic = topic;
 
             SetSource(null, item);
@@ -608,9 +617,8 @@ namespace Telegram.Services
             }
 
             var offset = -49;
-            var filter = message.Content is MessageAudio ? new SearchMessagesFilterAudio() : (SearchMessagesFilter)new SearchMessagesFilterVoiceNote();
+            var filter = message.Content is MessageAudio ? new SearchMessagesFilterAudio() : (SearchMessagesFilter)new SearchMessagesFilterVoiceAndVideoNote();
 
-            // TODO: 172 savedMessagesTopic
             var response = await message.ClientService.SendAsync(new SearchChatMessages(message.ChatId, _topic, string.Empty, null, message.Id, offset, 100, filter));
             if (response is FoundChatMessages messages)
             {
@@ -748,7 +756,7 @@ namespace Telegram.Services
         {
             if (_player == null)
             {
-                _player = new AsyncMediaPlayer();
+                _player = new AsyncMediaPlayer(true);
                 //_mediaPlayer.SystemMediaTransportControls.AutoRepeatMode = _settingsService.Playback.RepeatMode;
                 //_mediaPlayer.SystemMediaTransportControls.ButtonPressed += Transport_ButtonPressed;
                 //_mediaPlayer.PlaybackSession.PlaybackStateChanged += OnPlaybackStateChanged;
@@ -764,6 +772,16 @@ namespace Telegram.Services
             }
 
             return _player;
+        }
+
+        public void Attach(SwapChainPanel panel)
+        {
+            Run(player => player.Context.Attach(panel));
+        }
+
+        public void Detach(SwapChainPanel panel)
+        {
+            Run(player => player.Context.Detach(panel));
         }
     }
 

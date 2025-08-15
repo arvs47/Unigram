@@ -88,7 +88,7 @@
                             <TextBlock x:Name="Link"
                                        TextTrimming="CharacterEllipsis" />
                         </Button>
-                        <TextBlock Text="&#xE8C8;"
+                        <TextBlock Text="&#xEAC9;"
                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
                                    FontSize="20"
                                    Foreground="{ThemeResource AccentButtonBackground}"
@@ -135,7 +135,7 @@
                                                Text="NEW"
                                                HorizontalAlignment="Left"
                                                VerticalAlignment="Bottom"
-                                               Margin="4,-4,0,4"
+                                               Margin="4,-4,0,0"
                                                CornerRadius="4"
                                                Grid.Column="2" />
 

@@ -20,6 +20,8 @@
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/AnimationContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/AudioContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/CallContent.xaml" />
+        <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/ChecklistContent.xaml" />
+        <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/ChecklistTaskContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/ContactContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/DiceContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/DocumentContent.xaml" />
@@ -31,6 +33,7 @@
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/PaidMediaContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/PhotoContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/PollContent.xaml" />
+        <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/PollOptionContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/GiveawayContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/PreviewContent.xaml" />
         <ResourceDictionary Source="ms-appx:///Controls/Messages/Content/StickerContent.xaml" />
@@ -51,6 +54,22 @@
         <ResourceDictionary Source="ms-appx:///Controls/Messages/MessageSelector.xaml" />
     </ResourceDictionary.MergedDictionaries>
 
+    <Style x:Key="DefaultTextBoxStyle"
+           TargetType="TextBox"
+           BasedOn="{StaticResource DefaultTextBoxStyle}">
+        <Setter Property="FontFamily"
+                Value="{ThemeResource EmojiTextThemeFontFamily}" />
+    </Style>
+
+    <Style x:Key="DefaultRichEditBoxStyle"
+           TargetType="RichEditBox"
+           BasedOn="{StaticResource DefaultRichEditBoxStyle}">
+        <Setter Property="FontFamily"
+                Value="{ThemeResource EmojiTextThemeFontFamily}" />
+    </Style>
+
+    <Style TargetType="TextBox"
+           BasedOn="{StaticResource DefaultTextBoxStyle}" />
     <Style TargetType="local:PhoneTextBox"
            BasedOn="{StaticResource DefaultTextBoxStyle}" />
     <Style TargetType="local:ColorTextBox"
@@ -59,6 +78,8 @@
            BasedOn="{StaticResource DefaultTextBoxStyle}" />
     <Style TargetType="local:SuggestTextBox"
            BasedOn="{StaticResource DefaultTextBoxStyle}" />
+    <Style TargetType="RichEditBox"
+           BasedOn="{StaticResource DefaultRichEditBoxStyle}" />
     <Style TargetType="local:FormattedTextBox"
            BasedOn="{StaticResource DefaultRichEditBoxStyle}" />
     <Style TargetType="local:SettingsComboBox"
@@ -176,6 +197,10 @@
     </Style>
 
     <Style TargetType="local:TableViewItem">
+        <Setter Property="HorizontalContentAlignment"
+                Value="Left" />
+        <Setter Property="VerticalContentAlignment"
+                Value="Top" />
         <Setter Property="Padding"
                 Value="8,5,4,6" />
         <Setter Property="Template">
@@ -192,9 +217,248 @@
                             <ContentPresenter x:Name="Presenter"
                                               Margin="{TemplateBinding ContentMargin}"
                                               Padding="{TemplateBinding Padding}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
                                               VerticalAlignment="Top" />
                         </local:TableViewItemPresenter>
                     </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+    <Style TargetType="local:ReplyMarkupInlineButton">
+        <Setter Property="Background"
+                Value="Transparent" />
+        <Setter Property="Foreground"
+                Value="#FFFFFFFF" />
+        <Setter Property="BorderBrush"
+                Value="{ThemeResource ButtonBorderBrush}" />
+        <Setter Property="BorderThickness"
+                Value="{ThemeResource ButtonBorderThemeThickness}" />
+        <Setter Property="Padding"
+                Value="2,4,2,5" />
+        <Setter Property="HorizontalAlignment"
+                Value="Center" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="FontFamily"
+                Value="{ThemeResource EmojiThemeFontFamilyWithSymbols}" />
+        <Setter Property="FontWeight"
+                Value="Normal" />
+        <Setter Property="FontSize"
+                Value="{ThemeResource ControlContentThemeFontSize}" />
+        <Setter Property="UseSystemFocusVisuals"
+                Value="True" />
+        <Setter Property="FocusVisualMargin"
+                Value="-3" />
+        <Setter Property="Width"
+                Value="Auto" />
+        <Setter Property="Height"
+                Value="32" />
+        <Setter Property="CornerRadius"
+                Value="{StaticResource ControlCornerRadius}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="local:ReplyMarkupInlineButton">
+                    <Grid x:Name="RootGrid"
+                          Background="{TemplateBinding Background}"
+                          CornerRadius="{TemplateBinding CornerRadius}"
+                          Padding="{TemplateBinding Padding}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Background"
+                                                                       Storyboard.TargetName="RootGrid">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource SystemControlBackgroundListLowBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="Background"
+                                                                       Storyboard.TargetName="RootGrid">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource SystemControlBackgroundListMediumBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled" />
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+
+                        <Grid HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="IconPresenter"
+                                       x:Load="False"
+                                       Text="{TemplateBinding Icon}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       FontSize="20"
+                                       Margin="0,0,2,0"
+                                       AutomationProperties.AccessibilityView="Raw" />
+                            <TextBlock x:Name="ContentPresenter"
+                                       Text="{TemplateBinding Text}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       Padding="{TemplateBinding Padding}"
+                                       VerticalAlignment="Center"
+                                       AutomationProperties.AccessibilityView="Raw"
+                                       Grid.Column="1" />
+                        </Grid>
+
+                        <TextBlock Margin="4"
+                                   FontSize="12"
+                                   FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Top"
+                                   AutomationProperties.AccessibilityView="Raw"
+                                   Text="{TemplateBinding Glyph}" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="local:ReplyMarkupButton">
+        <!--<Setter Property="Background" Value="{ThemeResource PageHeaderBackgroundBrush}" />
+             <Setter Property="Foreground" Value="#FFFFFFFF" />
+             <Setter Property="BorderBrush" Value="{ThemeResource ButtonBorderBrush}" />
+             <Setter Property="BorderThickness" Value="{ThemeResource ButtonBorderThemeThickness}" />
+             <Setter Property="Padding" Value="2,4,2,4" />
+             <Setter Property="HorizontalAlignment" Value="Center" />
+             <Setter Property="VerticalAlignment" Value="Center" />
+             <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
+             <Setter Property="FontWeight" Value="Normal" />
+             <Setter Property="FontSize" Value="{ThemeResource ControlContentThemeFontSize}" />
+             <Setter Property="UseSystemFocusVisuals" Value="True" />
+             <Setter Property="FocusVisualMargin" Value="-3" />-->
+        <Setter Property="Background"
+                Value="{ThemeResource ButtonBackground}" />
+        <Setter Property="Foreground"
+                Value="{ThemeResource ButtonForeground}" />
+        <Setter Property="BorderBrush"
+                Value="{ThemeResource ButtonBorderBrush}" />
+        <Setter Property="BorderThickness"
+                Value="{ThemeResource ButtonBorderThemeThickness}" />
+        <Setter Property="Padding"
+                Value="8,4,8,5" />
+        <Setter Property="HorizontalAlignment"
+                Value="Left" />
+        <Setter Property="VerticalAlignment"
+                Value="Center" />
+        <Setter Property="FontFamily"
+                Value="{ThemeResource EmojiThemeFontFamily}" />
+        <Setter Property="FontWeight"
+                Value="Normal" />
+        <Setter Property="FontSize"
+                Value="{ThemeResource ControlContentThemeFontSize}" />
+        <Setter Property="UseSystemFocusVisuals"
+                Value="True" />
+        <Setter Property="FocusVisualMargin"
+                Value="-3" />
+        <Setter Property="Width"
+                Value="Auto" />
+        <Setter Property="Height"
+                Value="36" />
+        <Setter Property="CornerRadius"
+                Value="{StaticResource ControlCornerRadius}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="local:ReplyMarkupButton">
+                    <Grid x:Name="RootGrid"
+                          BackgroundSizing="OuterBorderEdge"
+                          Background="{TemplateBinding Background}"
+                          BorderBrush="{TemplateBinding BorderBrush}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          CornerRadius="{TemplateBinding CornerRadius}"
+                          Padding="{TemplateBinding Padding}">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid"
+                                                                       Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonBackgroundPointerOver}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid"
+                                                                       Storyboard.TargetProperty="BorderBrush">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonBorderBrushPointerOver}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
+                                                                       Storyboard.TargetProperty="Foreground">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonForegroundPointerOver}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid"
+                                                                       Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonBackgroundPressed}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid"
+                                                                       Storyboard.TargetProperty="BorderBrush">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonBorderBrushPressed}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
+                                                                       Storyboard.TargetProperty="Foreground">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonForegroundPressed}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid"
+                                                                       Storyboard.TargetProperty="Background">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonBackgroundDisabled}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="RootGrid"
+                                                                       Storyboard.TargetProperty="BorderBrush">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonBorderBrushDisabled}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter"
+                                                                       Storyboard.TargetProperty="Foreground">
+                                            <DiscreteObjectKeyFrame KeyTime="0"
+                                                                    Value="{ThemeResource ButtonForegroundDisabled}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <TextBlock x:Name="ContentPresenter"
+                                   Text="{TemplateBinding Text}"
+                                   TextWrapping="NoWrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                   AutomationProperties.AccessibilityView="Raw" />
+
+                        <TextBlock Margin="4"
+                                   FontSize="12"
+                                   FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Top"
+                                   AutomationProperties.AccessibilityView="Raw"
+                                   Text="{TemplateBinding Glyph}" />
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -284,6 +548,10 @@
     </Style>
 
     <Style TargetType="local:MasterDetailView">
+        <Setter Property="BackgroundMargin"
+                Value="0,0,0,0" />
+        <Setter Property="CornerRadius"
+                Value="{ThemeResource NavigationViewContentGridCornerRadius}" />
         <Setter Property="IsTabStop"
                 Value="False" />
         <Setter Property="Template">
@@ -298,8 +566,8 @@
                                     <VisualState.Setters>
                                         <Setter Target="DetailHeaderPresenter2.CornerRadius"
                                                 Value="0" />
-                                        <Setter Target="BackgroundPart.CornerRadius"
-                                                Value="0" />
+                                        <Setter Target="BackgroundPart.BorderThickness"
+                                                Value="0,1,0,0" />
                                         <Setter Target="BorderPart.CornerRadius"
                                                 Value="0" />
                                         <Setter Target="BorderPart.BorderThickness"
@@ -309,7 +577,7 @@
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Grid x:Name="DetailHeaderPresenter2"
-                              CornerRadius="{ThemeResource NavigationViewContentGridCornerRadius}">
+                              CornerRadius="{TemplateBinding CornerRadius}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="64" />
@@ -317,12 +585,12 @@
                             </Grid.RowDefinitions>
                             <Border x:Name="MaterialPart"
                                     Background="{ThemeResource LayerFillColorDefaultBrush}"
-                                    CornerRadius="{ThemeResource NavigationViewContentGridCornerRadius}"
+                                    CornerRadius="{TemplateBinding CornerRadius}"
                                     Grid.RowSpan="3" />
 
                             <chats:ChatBackgroundControl x:Name="BackgroundPart"
                                                          Margin="{TemplateBinding BackgroundMargin}"
-                                                         CornerRadius="9,0,0,0"
+                                                         BorderThickness="1,1,0,0"
                                                          Grid.RowSpan="3" />
 
                             <Grid MaxWidth="1000"
@@ -393,12 +661,14 @@
                                 </Border>
                             </Grid>
 
-                            <ContentControl Content="{TemplateBinding Banner}"
+                            <ContentControl x:Name="BannerPresenter"
+                                            Content="{TemplateBinding Banner}"
                                             IsTabStop="False"
                                             TabIndex="3"
                                             HorizontalContentAlignment="Stretch"
                                             VerticalContentAlignment="Stretch"
-                                            VerticalAlignment="Top" />
+                                            VerticalAlignment="Top"
+                                            Canvas.ZIndex="1" />
 
                             <Border x:Name="DetailHeaderBackground"
                                     Visibility="Collapsed"
@@ -413,8 +683,13 @@
                             <Border x:Name="BorderPart"
                                     BorderBrush="{ThemeResource NavigationViewContentGridBorderBrush}"
                                     BorderThickness="{ThemeResource NavigationViewContentGridBorderThickness}"
-                                    CornerRadius="{ThemeResource NavigationViewContentGridCornerRadius}"
-                                    Grid.RowSpan="3" />
+                                    CornerRadius="{TemplateBinding CornerRadius}"
+                                    Grid.RowSpan="3"
+                                    Canvas.ZIndex="2" />
+
+                            <local:PlaybackOverlay Visibility="Collapsed"
+                                                   Grid.Row="1"
+                                                   Grid.RowSpan="2" />
                         </Grid>
 
                         <ContentControl x:Name="MasterFrame"
@@ -708,6 +983,16 @@
             <Setter.Value>
                 <ControlTemplate TargetType="local:IdentityIcon">
                     <Grid>
+                        <local:AnimatedImage x:Name="Particles"
+                                             x:Load="False"
+                                             IsViewportAware="True"
+                                             FrameSize="24,24"
+                                             DecodeFrameType="Logical"
+                                             Stretch="UniformToFill"
+                                             VerticalAlignment="Bottom"
+                                             Width="24"
+                                             Height="24"
+                                             Margin="-2,-4,-2,-4" />
                         <local:CustomEmojiIcon x:Name="Status"
                                                x:Load="False"
                                                ReplacementColor="{TemplateBinding Foreground}"
@@ -981,7 +1266,8 @@
                             <ColumnDefinition />
                         </Grid.ColumnDefinitions>
                         <Grid Margin="0,-4">
-                            <local:CustomEmojiIcon x:Name="Icon" />
+                            <local:CustomEmojiIcon x:Name="Icon"
+                                                   CleanOnSourceChanged="False" />
                             <Popup x:Name="Overlay"
                                    IsHitTestVisible="False"
                                    Margin="-32"
@@ -990,7 +1276,6 @@
                         </Grid>
 
                         <local:AnimatedTextBlock x:Name="Count"
-                                                 x:Load="False"
                                                  Foreground="{ThemeResource MessageReactionForegroundBrush}"
                                                  TextStyle="{StaticResource BaseCaptionTextBlockStyle}"
                                                  VerticalAlignment="Center"
@@ -1078,7 +1363,8 @@
                             <ColumnDefinition />
                         </Grid.ColumnDefinitions>
                         <Grid Margin="0,-4">
-                            <local:CustomEmojiIcon x:Name="Icon" />
+                            <local:CustomEmojiIcon x:Name="Icon"
+                                                   CleanOnSourceChanged="False" />
                             <Popup x:Name="Overlay"
                                    IsHitTestVisible="False"
                                    Margin="-32"
@@ -1087,7 +1373,6 @@
                         </Grid>
 
                         <local:AnimatedTextBlock x:Name="Count"
-                                                 x:Load="False"
                                                  Foreground="{ThemeResource MessageReactionPaidForegroundBrush}"
                                                  TextStyle="{StaticResource BaseCaptionTextBlockStyle}"
                                                  VerticalAlignment="Center"
@@ -1161,7 +1446,8 @@
                                                     Grid.ColumnSpan="2" />
 
                         <Grid Margin="0,-4">
-                            <local:CustomEmojiIcon x:Name="Icon" />
+                            <local:CustomEmojiIcon x:Name="Icon"
+                                                   CleanOnSourceChanged="False" />
                             <Popup x:Name="Overlay"
                                    IsHitTestVisible="False"
                                    Margin="-32"
@@ -1170,8 +1456,6 @@
                         </Grid>
 
                         <local:AnimatedTextBlock x:Name="Count"
-                                                 x:Load="False"
-                                                 Visibility="Collapsed"
                                                  Foreground="{ThemeResource MessageReactionForegroundBrush}"
                                                  TextStyle="{StaticResource BaseCaptionTextBlockStyle}"
                                                  VerticalAlignment="Center"
@@ -1236,11 +1520,11 @@
                                                        Grid.ColumnSpan="2" />
 
                         <Grid Margin="0,-4">
-                            <local:CustomEmojiIcon x:Name="Icon" />
+                            <local:CustomEmojiIcon x:Name="Icon"
+                                                   CleanOnSourceChanged="False" />
                         </Grid>
 
                         <local:AnimatedTextBlock x:Name="Count"
-                                                 x:Load="False"
                                                  Foreground="{ThemeResource MessageReactionForegroundBrush}"
                                                  TextStyle="{StaticResource BaseCaptionTextBlockStyle}"
                                                  VerticalAlignment="Center"
@@ -1629,10 +1913,12 @@
     <Style TargetType="local:FormattedTextBlock">
         <Setter Property="IsTabStop"
                 Value="False" />
+        <Setter Property="FontSize"
+                Value="14" />
         <Setter Property="FontFamily"
                 Value="{ThemeResource EmojiThemeFontFamily}" />
-        <Setter Property="TextStyle"
-                Value="{StaticResource BodyRichTextBlockStyle}" />
+        <Setter Property="HyperlinkForeground"
+                Value="{ThemeResource MessageForegroundLinkBrush}" />
         <Setter Property="TextAlignment"
                 Value="DetectFromContent" />
         <Setter Property="EmojiStyle">
@@ -1650,16 +1936,18 @@
                         <Canvas x:Name="Below" />
                         <RichTextBlock x:Name="TextBlock"
                                        Foreground="{TemplateBinding Foreground}"
-                                       Style="{TemplateBinding TextStyle}"
                                        Padding="{TemplateBinding Padding}"
                                        IsTextSelectionEnabled="{TemplateBinding IsTextSelectionEnabled}"
                                        FontFamily="{TemplateBinding FontFamily}"
+                                       FontSize="{TemplateBinding FontSize}"
                                        TextAlignment="{TemplateBinding TextAlignment}"
                                        TextTrimming="{TemplateBinding TextTrimming}"
+                                       TextWrapping="{TemplateBinding TextWrapping}"
+                                       TextDecorations="{TemplateBinding TextDecorations}"
                                        MaxLines="{TemplateBinding MaxLines}"
                                        OverflowContentTarget="{TemplateBinding OverflowContentTarget}"
-                                       HorizontalTextAlignment="DetectFromContent"
-                                       TextReadingOrder="UseFlowDirection"
+                                       HorizontalTextAlignment="{TemplateBinding HorizontalTextAlignment}"
+                                       TextReadingOrder="{TemplateBinding TextReadingOrder}"
                                        OpticalMarginAlignment="None" />
                     </Grid>
                 </ControlTemplate>
@@ -1712,7 +2000,21 @@
         </Setter>
     </Style>
 
+    <Style TargetType="chats:ChatBackgroundControl">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="chats:ChatBackgroundControl">
+                    <chats:ChatBackgroundPresenter x:Name="Presenter"
+                                                   CornerRadius="{TemplateBinding CornerRadius}"
+                                                   BorderThickness="{TemplateBinding BorderThickness}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="chats:ChatBackgroundPresenter">
+        <Setter Property="BackgroundSizing"
+                Value="OuterBorderEdge" />
         <Setter Property="Background"
                 Value="Transparent" />
         <Setter Property="BorderBrush"
@@ -1724,15 +2026,18 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="chats:ChatBackgroundPresenter">
-                    <Border Background="{TemplateBinding Background}"
-                            CornerRadius="{TemplateBinding CornerRadius}">
+                    <Grid BackgroundSizing="OuterBorderEdge"
+                          Background="{TemplateBinding Background}"
+                          BorderThickness="{TemplateBinding BorderThickness}"
+                          CornerRadius="{TemplateBinding CornerRadius}">
                         <Border x:Name="Canvas"
                                 Background="{TemplateBinding Foreground}"
                                 CornerRadius="{TemplateBinding CornerRadius}">
-                            <Border Background="{TemplateBinding BorderBrush}"
-                                    CornerRadius="{TemplateBinding CornerRadius}" />
                         </Border>
-                    </Border>
+                        <Border x:Name="Negative"
+                                Background="{TemplateBinding NegativeBrush}"
+                                CornerRadius="{TemplateBinding CornerRadius}" />
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -2252,7 +2557,7 @@
     </windows11:Style>
 
     <Style TargetType="local:TableListView">
-        <Setter Property="CornerRadius"
+        <Setter Property="ItemContainerCornerRadius"
                 Value="4" />
         <Setter Property="IsTabStop"
                 Value="False" />
@@ -2405,7 +2710,7 @@
                                       IsDeferredScrollingEnabled="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
                                       BringIntoViewOnFocusChange="{TemplateBinding ScrollViewer.BringIntoViewOnFocusChange}"
                                       AutomationProperties.AccessibilityView="Raw">
-                            <ItemsPresenter />
+                            <ItemsPresenter Padding="{TemplateBinding Padding}" />
                         </ScrollViewer>
                     </Border>
                 </ControlTemplate>
@@ -2443,9 +2748,24 @@
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver" />
                                 <VisualState x:Name="Pressed" />
-                                <VisualState x:Name="Selected" />
-                                <VisualState x:Name="PointerOverSelected" />
-                                <VisualState x:Name="PressedSelected" />
+                                <VisualState x:Name="Selected">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Foreground"
+                                                Value="{ThemeResource NavigationViewSelectionIndicatorForeground}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="PointerOverSelected">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Foreground"
+                                                Value="{ThemeResource NavigationViewSelectionIndicatorForeground}" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="PressedSelected">
+                                    <VisualState.Setters>
+                                        <Setter Target="ContentPresenter.Foreground"
+                                                Value="{ThemeResource NavigationViewSelectionIndicatorForeground}" />
+                                    </VisualState.Setters>
+                                </VisualState>
                             </VisualStateGroup>
                             <VisualStateGroup x:Name="ReorderHintStates">
                                 <VisualState x:Name="NoReorderHint" />
@@ -2558,8 +2878,8 @@
                                        Height="3"
                                        Fill="{ThemeResource NavigationViewSelectionIndicatorForeground}"
                                        Opacity="0"
-                                       RadiusX="3"
-                                       RadiusY="3" />
+                                       RadiusX="1.5"
+                                       RadiusY="1.5" />
                         </Grid>
                     </Grid>
                 </ControlTemplate>
@@ -4488,7 +4808,7 @@
                                    VerticalAlignment="Center"
                                    Margin="0,1,0,2"
                                    Foreground="#FFFFFF"
-                                   FontFamily="{StaticResource EmojiThemeFontFamilyWithSymbols}" />
+                                   FontFamily="{StaticResource EmojiThemeFontFamilyWithRounded}" />
                     </Border>
                 </ControlTemplate>
             </Setter.Value>
@@ -4503,11 +4823,14 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="local:ImageView">
-                    <Image x:Name="Holder"
-                           Source="{TemplateBinding Source}"
-                           Stretch="{TemplateBinding Stretch}"
-                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    <Border x:Name="RootGrid"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                        <Image x:Name="Presenter"
+                               Source="{TemplateBinding Source}"
+                               Stretch="{TemplateBinding Stretch}"
+                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -4794,7 +5117,7 @@
         <Setter Property="BorderThickness"
                 Value="{ThemeResource TextControlBorderThemeThickness}" />
         <Setter Property="FontFamily"
-                Value="{ThemeResource ContentControlThemeFontFamily}" />
+                Value="{ThemeResource EmojiTextThemeFontFamily}" />
         <Setter Property="FontSize"
                 Value="{ThemeResource ControlContentThemeFontSize}" />
         <Setter Property="ScrollViewer.HorizontalScrollMode"
@@ -5088,6 +5411,8 @@
     </Style>
 
     <Style TargetType="local:PlaybackSlider">
+        <Setter Property="UseSystemFocusVisuals"
+                Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="local:PlaybackSlider">
@@ -5099,11 +5424,11 @@
                                                       To="Normal">
                                         <Storyboard>
                                             <DoubleAnimation Duration="{ThemeResource ScrollBarExpandDuration}"
-                                                             Storyboard.TargetName="HorizontalThumbTransform"
+                                                             Storyboard.TargetName="ProgressBarIndicatorTransform"
                                                              Storyboard.TargetProperty="ScaleY"
                                                              To="0.3333333333333333" />
                                             <DoubleAnimation Duration="{ThemeResource ScrollBarExpandDuration}"
-                                                             Storyboard.TargetName="HorizontalThumbTransform"
+                                                             Storyboard.TargetName="ProgressBarIndicatorTransform"
                                                              Storyboard.TargetProperty="TranslateY"
                                                              To="4" />
                                         </Storyboard>
@@ -5113,11 +5438,11 @@
                                 <VisualState x:Name="PointerOver">
                                     <Storyboard>
                                         <DoubleAnimation Duration="{ThemeResource ScrollBarExpandDuration}"
-                                                         Storyboard.TargetName="HorizontalThumbTransform"
+                                                         Storyboard.TargetName="ProgressBarIndicatorTransform"
                                                          Storyboard.TargetProperty="ScaleY"
                                                          To="1.0" />
                                         <DoubleAnimation Duration="{ThemeResource ScrollBarExpandDuration}"
-                                                         Storyboard.TargetName="HorizontalThumbTransform"
+                                                         Storyboard.TargetName="ProgressBarIndicatorTransform"
                                                          Storyboard.TargetProperty="TranslateY"
                                                          To="0" />
                                     </Storyboard>
@@ -5127,17 +5452,13 @@
                         <Grid x:Name="LayoutRoot"
                               Background="{ThemeResource SystemControlBackgroundBaseLowBrush}">
                             <Grid.RenderTransform>
-                                <CompositeTransform x:Name="HorizontalThumbTransform"
+                                <CompositeTransform x:Name="ProgressBarIndicatorTransform"
                                                     ScaleX="1.0"
                                                     ScaleY="0.3333333333333333"
                                                     TranslateX="0"
                                                     TranslateY="4" />
                             </Grid.RenderTransform>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition />
-                                <ColumnDefinition />
-                            </Grid.ColumnDefinitions>
-                            <Border x:Name="HorizontalThumb"
+                            <Border x:Name="ProgressBarIndicator"
                                     Background="{ThemeResource SystemControlHighlightAccentBrush}" />
                         </Grid>
                     </Grid>
@@ -6711,8 +7032,8 @@
                                        Height="36"
                                        Fill="{ThemeResource NavigationViewSelectionIndicatorForeground}"
                                        Opacity="0"
-                                       RadiusX="3"
-                                       RadiusY="3" />
+                                       RadiusX="1.5"
+                                       RadiusY="1.5" />
                         </Grid>
                         <Border x:Name="MultiSelectSquare"
                                 BorderBrush="{ThemeResource SystemControlForegroundBaseMediumHighBrush}"
@@ -7290,8 +7611,8 @@
                                        Height="36"
                                        Fill="{ThemeResource NavigationViewSelectionIndicatorForeground}"
                                        Opacity="0"
-                                       RadiusX="3"
-                                       RadiusY="3" />
+                                       RadiusX="1.5"
+                                       RadiusY="1.5" />
                         </Grid>
                         <Border x:Name="MultiSelectSquare"
                                 BorderBrush="{ThemeResource SystemControlForegroundBaseMediumHighBrush}"

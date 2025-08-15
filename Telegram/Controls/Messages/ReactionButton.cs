@@ -12,7 +12,6 @@ using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Windows.Foundation;
-using Windows.System;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation.Peers;
@@ -146,7 +145,7 @@ namespace Telegram.Controls.Messages
                 Icon.Source = new ReactionFileSource(message.ClientService, reaction.Type)
                 {
                     UseCenterAnimation = true,
-                    IsUnique = true
+                    IsAnimated = false
                 };
             }
         }
@@ -157,10 +156,8 @@ namespace Telegram.Controls.Messages
 
             if (interaction.TotalCount > interaction.RecentSenderIds.Count)
             {
-                Count ??= GetTemplateChild(nameof(Count)) as AnimatedTextBlock;
                 Count.Visibility = Visibility.Visible;
-
-                Count.Text = Formatter.ShortNumber(interaction.TotalCount);
+                Count.SetText(Formatter.ShortNumber(interaction.TotalCount), recycled);
 
                 if (RecentChoosers != null)
                 {
@@ -181,8 +178,7 @@ namespace Telegram.Controls.Messages
                 }
                 else
                 {
-                    destination.Clear();
-                    destination.AddRange(origin);
+                    destination.ReplaceWith(origin);
                 }
 
                 if (Count != null)
@@ -218,9 +214,11 @@ namespace Telegram.Controls.Messages
 
         protected override void OnApplyTemplate()
         {
+            Count = GetTemplateChild(nameof(Count)) as AnimatedTextBlock;
             Overlay = GetTemplateChild(nameof(Overlay)) as Popup;
             Icon = GetTemplateChild(nameof(Icon)) as CustomEmojiIcon;
             Icon.Ready += OnReady;
+            Icon.LoopCompleted += OnLoopCompleted;
 
             if (_reaction != null)
             {
@@ -235,6 +233,19 @@ namespace Telegram.Controls.Messages
         private void OnReady(object sender, EventArgs e)
         {
             SetUnread(_unread);
+        }
+
+        private void OnLoopCompleted(object sender, AnimatedImageLoopCompletedEventArgs e)
+        {
+            this.BeginOnUIThread(OnLoopCompleted);
+        }
+
+        private void OnLoopCompleted()
+        {
+            if (Icon?.Source is ReactionFileSource reaction && Icon.Source.IsAnimated && this.IsConnected())
+            {
+                Icon.Source = reaction.Clone(false);
+            }
         }
 
         protected override void OnToggle()
@@ -359,6 +370,11 @@ namespace Telegram.Controls.Messages
 
         protected void Animate(File around, bool cache)
         {
+            if (Icon?.Source is ReactionFileSource reaction && !Icon.Source.IsAnimated)
+            {
+                Icon.Source = reaction.Clone(true);
+            }
+
             Icon?.Play();
 
             var popup = Overlay;

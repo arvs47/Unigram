@@ -20,7 +20,6 @@ using Telegram.ViewModels.Drawers;
 using Telegram.ViewModels.Stories;
 using Telegram.Views.Stars.Popups;
 using Windows.Foundation;
-using Windows.System;
 using Windows.UI;
 using Windows.UI.Composition;
 using Windows.UI.Xaml;
@@ -32,7 +31,6 @@ using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Controls.Messages
 {
@@ -195,10 +193,9 @@ namespace Telegram.Controls.Messages
 
             LayoutRoot.Padding = new Thickness(16, 40, 16, 32);
 
-            var device = ElementComposition.GetSharedDevice();
-            var rect1 = CanvasGeometry.CreateRectangle(device, Math.Min(width - actualWidth, 0), 0, Math.Max(width + 16 + 16 + Math.Max(0, padding), actualWidth), 860);
-            var elli1 = CanvasGeometry.CreateRoundedRectangle(device, width - actualWidth + 18 + 16, height + height + 5, presenter.ActualSize.X, 860, 8, 8);
-            var group1 = CanvasGeometry.CreateGroup(device, new[] { elli1, rect1 }, CanvasFilledRegionDetermination.Alternate);
+            var rect1 = CanvasGeometry.CreateRectangle(null, Math.Min(width - actualWidth, 0), 0, Math.Max(width + 16 + 16 + Math.Max(0, padding), actualWidth), 860);
+            var elli1 = CanvasGeometry.CreateRoundedRectangle(null, width - actualWidth + 18 + 16, height + height + 5, presenter.ActualSize.X, 860, 8, 8);
+            var group1 = CanvasGeometry.CreateGroup(null, new[] { elli1, rect1 }, CanvasFilledRegionDetermination.Alternate);
 
             var rootVisual = ElementComposition.GetElementVisual(LayoutRoot);
             var compositor = rootVisual.Compositor;
@@ -488,10 +485,10 @@ namespace Telegram.Controls.Messages
 
             LayoutRoot.Padding = new Thickness(16, 40, 16, 32);
 
-            var device = ElementComposition.GetSharedDevice();
-            var rect1 = CanvasGeometry.CreateRectangle(device, Math.Min(width - actualWidth, 0), 0, Math.Max(width + 16 + 16 + Math.Max(0, padding), actualWidth), 860);
-            var elli1 = CanvasGeometry.CreateRoundedRectangle(device, width - actualWidth + 18 + 16, height + height + 5, presenter.ActualSize.X, 860, 8, 8);
-            var group1 = CanvasGeometry.CreateGroup(device, new[] { elli1, rect1 }, CanvasFilledRegionDetermination.Alternate);
+            //var device = ElementComposition.GetSharedDevice();
+            var rect1 = CanvasGeometry.CreateRectangle(null, Math.Min(width - actualWidth, 0), 0, Math.Max(width + 16 + 16 + Math.Max(0, padding), actualWidth), 860);
+            var elli1 = CanvasGeometry.CreateRoundedRectangle(null, width - actualWidth + 18 + 16, height + height + 5, presenter.ActualSize.X, 860, 8, 8);
+            var group1 = CanvasGeometry.CreateGroup(null, new[] { elli1, rect1 }, CanvasFilledRegionDetermination.Alternate);
 
             var rootVisual = ElementComposition.GetElementVisual(LayoutRoot);
             var compositor = rootVisual.Compositor;
@@ -763,7 +760,7 @@ namespace Telegram.Controls.Messages
             }
             else
             {
-                BaseObject added;
+                Object added;
                 if (reaction is ReactionTypePaid)
                 {
                     var popup = new ReactPopup(_message.ClientService, _message);

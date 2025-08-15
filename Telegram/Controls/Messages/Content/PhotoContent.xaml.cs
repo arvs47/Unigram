@@ -111,7 +111,7 @@ namespace Telegram.Controls.Messages.Content
 
             _hidden = (prevId != nextId || _hidden) && hasSpoiler;
 
-            LayoutRoot.Constraint = isSecret ? Constants.SecretSize : ((object)_paidMedia ?? photo);
+            LayoutRoot.Constraint = _album ? null : isSecret ? Constants.SecretSize : ((object)_paidMedia ?? photo);
             LayoutRoot.Background = null;
             Texture.Stretch = _album
                 ? Stretch.UniformToFill
@@ -491,14 +491,6 @@ namespace Telegram.Controls.Messages.Content
                 return;
             }
 
-            if (hasSpoiler && _hidden)
-            {
-                _hidden = false;
-                UpdateMessage(_message);
-
-                return;
-            }
-
             var big = photo.GetBig();
             if (big == null)
             {
@@ -537,6 +529,11 @@ namespace Telegram.Controls.Messages.Content
             else if (_paidMedia != null)
             {
                 _message.Delegate.OpenPaidMedia(_message, _paidMedia, this);
+            }
+            else if (hasSpoiler && _hidden)
+            {
+                _hidden = false;
+                UpdateMessage(_message);
             }
             else
             {

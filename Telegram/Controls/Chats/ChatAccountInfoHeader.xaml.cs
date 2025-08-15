@@ -12,6 +12,7 @@ using Telegram.Streams;
 using Telegram.Td;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
+using Telegram.Views;
 using Telegram.Views.Premium.Popups;
 using Windows.Foundation;
 using Windows.UI.Composition;
@@ -27,6 +28,8 @@ namespace Telegram.Controls.Chats
         public DialogViewModel ViewModel => DataContext as DialogViewModel;
 
         private IClientService _clientService;
+
+        private ChatView _chatView;
         private UIElement _parent;
 
         private long _thumbnailToken;
@@ -36,10 +39,13 @@ namespace Telegram.Controls.Chats
             InitializeComponent();
         }
 
-        public void InitializeParent(UIElement parent)
+        private float _animatedHeight;
+        public float AnimatedHeight => _collapsed ? 0 : ActualSize.Y;
+
+        public void InitializeParent(ChatView chatView, UIElement parent)
         {
-            _parent = parent;
-            ElementCompositionPreview.SetIsTranslationEnabled(parent, true);
+            _chatView = chatView;
+            ElementCompositionPreview.SetIsTranslationEnabled(_parent = parent, true);
         }
 
         public void UpdateUser(IClientService clientService, Chat chat, User user, UserFullInfo fullInfo)
@@ -77,6 +83,10 @@ namespace Telegram.Controls.Chats
                         player.Height = 20;
                         player.FrameSize = new Size(20, 20);
                         player.Source = new CustomEmojiFileSource(clientService, user.EmojiStatus.Type);
+                        player.HorizontalAlignment = HorizontalAlignment.Left;
+                        player.FlowDirection = FlowDirection.LeftToRight;
+                        player.IsHitTestVisible = false;
+                        player.Margin = new Thickness(0, -2, 0, -6);
 
                         //if (style != null)
                         //{
@@ -87,7 +97,7 @@ namespace Telegram.Controls.Chats
                         //var baseline = parent.FontSize == 11 ? -3 : 0;
 
                         var inline = new InlineUIContainer();
-                        inline.Child = new CustomEmojiContainer(PremiumUser, player, size: 20);
+                        inline.Child = player;
 
                         // If the Span starts with a InlineUIContainer the RichTextBlock bugs and shows ellipsis
                         if (PremiumUserText.Inlines.Empty())
@@ -127,7 +137,7 @@ namespace Telegram.Controls.Chats
                 PayingUser.Visibility = Visibility.Visible;
                 PayingUserText.Inlines.Clear();
 
-                var text = string.Format(Strings.MessageLockedStarsRemoveFee, "{0}", fullInfo.IncomingPaidMessageStarCount.ToString("N0")).Replace("\u2B50", Icons.Premium + "\u200A");
+                var text = string.Format(Strings.MessageLockedStarsRemoveFee.ReplaceStar(Icons.Premium), "{0}", fullInfo.IncomingPaidMessageStarCount.ToString("N0"));
 
                 var markdown = ClientEx.ParseMarkdown(text);
                 if (markdown.Entities.Count == 1)
@@ -252,18 +262,21 @@ namespace Telegram.Controls.Chats
                 }
             };
 
+            _animatedHeight = ActualSize.Y;
+            _chatView.UpdateMessagesHeaderPadding();
+
             var clip = visual.Compositor.CreateScalarKeyFrameAnimation();
             clip.InsertKeyFrame(show ? 0 : 1, ActualSize.Y);
             clip.InsertKeyFrame(show ? 1 : 0, 0);
             clip.Duration = Constants.FastAnimation;
 
-            var offset = visual.Compositor.CreateVector3KeyFrameAnimation();
-            offset.InsertKeyFrame(show ? 0 : 1, new Vector3(0, -ActualSize.Y, 0));
-            offset.InsertKeyFrame(show ? 1 : 0, new Vector3());
+            var offset = visual.Compositor.CreateScalarKeyFrameAnimation();
+            offset.InsertKeyFrame(show ? 0 : 1, -ActualSize.Y);
+            offset.InsertKeyFrame(show ? 1 : 0, 0);
             offset.Duration = Constants.FastAnimation;
 
             visual.Clip.StartAnimation("TopInset", clip);
-            parent.StartAnimation("Translation", offset);
+            parent.StartAnimation("Translation.Y", offset);
 
             batch.End();
         }

@@ -15,7 +15,6 @@ using Telegram.Navigation.Services;
 using Telegram.Services;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
-using Windows.System;
 using Windows.UI.Composition;
 using Windows.UI.Core;
 using Windows.UI.ViewManagement;
@@ -771,7 +770,7 @@ namespace Telegram.Navigation
 
     public interface INavigatingPage : INavigablePage
     {
-        void OnBackRequesting(HandledEventArgs args);
+        void OnBackRequesting(BackRequestedRoutedEventArgs args);
     }
 
     public interface ISearchablePage

@@ -18,11 +18,11 @@ using Telegram.Collections;
 using Telegram.Common;
 using Telegram.Controls;
 using Telegram.Controls.Chats;
+using Telegram.Controls.Drawers;
 using Telegram.Controls.Media;
 using Telegram.Converters;
 using Telegram.Entities;
 using Telegram.Navigation;
-using Telegram.Services;
 using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
@@ -276,7 +276,7 @@ namespace Telegram.Views.Popups
             IsMediaSelected = media && IsMediaAllowed;
             IsFilesSelected = !IsMediaSelected;
 
-            SendHighQuality = SettingsService.Current.Diagnostics.SendLargePhotos;
+            SendHighQuality = viewModel.Settings.SendLargePhotos;
 
             EmojiPanel.DataContext = EmojiDrawerViewModel.Create(viewModel.SessionId);
             CaptionInput.CustomEmoji = CustomEmoji;
@@ -345,10 +345,8 @@ namespace Telegram.Views.Popups
                 return;
             }
 
-            CaptionInput.Document.GetText(TextGetOptions.None, out string text);
-
-            var query = text.Substring(0, Math.Min(CaptionInput.Document.Selection.EndPosition, text.Length));
-            var entity = AutocompleteEntityFinder.Search(query, out string result, out int index);
+            var selection = CaptionInput.Document.Selection.GetClone();
+            var entity = AutocompleteEntityFinder.Search(selection, out string result, out int index);
 
             if (e.ClickedItem is User user && entity == AutocompleteEntity.Username)
             {
@@ -1135,7 +1133,13 @@ namespace Telegram.Views.Popups
 
                 var flyout = new MenuFlyout();
 
-                flyout.CreateFlyoutItem(SendWithoutGrouping, Strings.SendWithoutGrouping, "\uE90C");
+                // If number of items is different from the view then there's some album
+                var itemsView = ComposeViewModel.GetItemsView(Items, true, false, _photoAllowed, _videoAllowed, _audioAllowed, _documentAllowed);
+                if (itemsView.Count < Items.Count)
+                {
+                    flyout.CreateFlyoutItem(SendWithoutGrouping, Strings.SendWithoutGrouping, "\uE90C");
+                }
+
                 flyout.CreateFlyoutItem(SendWithoutSound, Strings.SendWithoutSound, Icons.AlertOff);
                 flyout.CreateFlyoutItem(SendScheduled, self ? Strings.SetReminder : Strings.ScheduleMessage, Icons.CalendarClock);
 
@@ -1227,7 +1231,7 @@ namespace Telegram.Views.Popups
             EmojiFlyout.ShowAt(CaptionPanel, new FlyoutShowOptions { ShowMode = FlyoutShowMode.Transient });
         }
 
-        private void Emoji_ItemClick(object sender, ItemClickEventArgs e)
+        private void Emoji_ItemClick(object sender, EmojiDrawerItemClickEventArgs e)
         {
             if (e.ClickedItem is EmojiData emoji)
             {
@@ -1321,6 +1325,7 @@ namespace Telegram.Views.Popups
         private void ToggleSendHighQuality()
         {
             SendHighQuality = !SendHighQuality;
+            ViewModel.Settings.SendLargePhotos = SendHighQuality;
         }
 
         private void ToggleSendWithSpoiler()
@@ -1468,7 +1473,7 @@ namespace Telegram.Views.Popups
         public StorageAlbumPanel()
         {
             // I don't like this much, but it's the easier way to add margins between children
-            Margin = new Thickness(0, 0, -MessageAlbum.ITEM_MARGIN, -MessageAlbum.ITEM_MARGIN);
+            Margin = new Thickness(0, 0, -StorageAlbum.ITEM_MARGIN, -StorageAlbum.ITEM_MARGIN);
         }
 
         private (Rect[], Size) _positions;
@@ -1539,9 +1544,9 @@ namespace Telegram.Views.Popups
                     VerticalContentAlignment = VerticalAlignment.Stretch,
                     MinWidth = 0,
                     MinHeight = 0,
-                    MaxWidth = MessageAlbum.MAX_WIDTH,
-                    MaxHeight = MessageAlbum.MAX_HEIGHT,
-                    Margin = new Thickness(0, 0, MessageAlbum.ITEM_MARGIN, MessageAlbum.ITEM_MARGIN),
+                    MaxWidth = StorageAlbum.MAX_WIDTH,
+                    MaxHeight = StorageAlbum.MAX_HEIGHT,
+                    Margin = new Thickness(0, 0, StorageAlbum.ITEM_MARGIN, StorageAlbum.ITEM_MARGIN),
                     Padding = new Thickness(0),
                     Style = BootStrapper.Current.Resources["EmptyButtonStyle"] as Style
                 };

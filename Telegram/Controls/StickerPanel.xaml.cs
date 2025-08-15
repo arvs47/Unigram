@@ -29,7 +29,7 @@ namespace Telegram.Controls
         public event EventHandler SettingsClick;
 
         public Action<object> EmojiClick { get; set; }
-        public event TypedEventHandler<UIElement, ItemContextRequestedEventArgs<Sticker>> EmojiContextRequested;
+        public event TypedEventHandler<UIElement, ItemContextRequestedEventArgs<StickerViewModel>> EmojiContextRequested;
 
         public event EventHandler<StickerDrawerItemClickEventArgs> StickerClick;
         public event EventHandler<ItemContextRequestedEventArgs<Sticker>> StickerContextRequested;
@@ -65,7 +65,7 @@ namespace Telegram.Controls
             header.Clip = header.Compositor.CreateInsetClip(0, -40, 0, 40);
         }
 
-        private void Emojis_ItemClick(object sender, ItemClickEventArgs e)
+        private void Emojis_ItemClick(object sender, EmojiDrawerItemClickEventArgs e)
         {
             if (e.ClickedItem is EmojiData emoji)
             {
@@ -183,7 +183,6 @@ namespace Telegram.Controls
                     StickersRoot.ItemClick += StickerClick;
                     StickersRoot.ItemContextRequested += StickerContextRequested;
                     StickersRoot.ChoosingItem += ChoosingSticker;
-                    StickersRoot.SettingsClick += SettingsClick;
                 }
                 else
                 {
@@ -221,6 +220,10 @@ namespace Telegram.Controls
 
             visualIn.StartAnimation("Offset", offsetIn);
             visualIn.StartAnimation("Opacity", opacityIn);
+
+            Settings.Visibility = index != 1
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private void UnloadAtIndex(int index)
@@ -257,7 +260,6 @@ namespace Telegram.Controls
                 StickersRoot.ItemClick -= StickerClick;
                 StickersRoot.ItemContextRequested -= StickerContextRequested;
                 StickersRoot.ChoosingItem -= ChoosingSticker;
-                StickersRoot.SettingsClick -= SettingsClick;
                 UnloadObject(StickersRoot);
 
                 Tab2.Visibility = Visibility.Collapsed;
@@ -368,6 +370,11 @@ namespace Telegram.Controls
                 element.Loaded -= StickersRoot_Loaded;
                 Show(Tab2, _prevIndex > 2, 2);
             }
+        }
+
+        private void Settings_Click(object sender, RoutedEventArgs e)
+        {
+            SettingsClick?.Invoke(this, EventArgs.Empty);
         }
     }
 

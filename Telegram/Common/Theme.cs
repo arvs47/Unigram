@@ -7,7 +7,6 @@
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Services.Settings;
@@ -57,26 +56,20 @@ namespace Telegram.Common
         public void UpdateEmojiSet()
         {
             var xamlAutoFontFamilyValue = SettingsService.Current.Appearance.FontFamily;
+            var xamlAutoFontFamilyDefault = false;
+
+            var comma = ", ";
 
             if (string.IsNullOrEmpty(xamlAutoFontFamilyValue))
             {
                 xamlAutoFontFamilyValue = FontFamily.XamlAutoFontFamily.Source;
+                xamlAutoFontFamilyDefault = true;
             }
 
             if (xamlAutoFontFamilyValue == "Segoe UI Variable")
             {
                 xamlAutoFontFamilyValue = "Segoe UI";
             }
-
-            // TODO: including Segoe UI breaks keycap emoji,
-            // not including it breaks persian numerals.
-            //if (xamlAutoFontFamilyValue == "Segoe UI")
-            //{
-            //    xamlAutoFontFamilyValue = string.Empty;
-            //}
-
-            var xamlAutoFontFamily = new StringBuilder(xamlAutoFontFamilyValue);
-            var comma = ", ";
 
             //if (false)
             //{
@@ -105,23 +98,28 @@ namespace Telegram.Common
             switch (SettingsService.Current.Appearance.EmojiSet)
             {
                 case "microsoft":
-                    this["EmojiOnlyThemeFontFamily"] = "ms-appx:///Assets/Emoji/microsoft.ttf#Segoe UI Emoji";
-                    xamlAutoFontFamily.Prepend("ms-appx:///Assets/Emoji/microsoft.ttf#Segoe UI Emoji", comma);
+                    XamlAutoFontFamily = "ms-appx:///Assets/Emoji/microsoft.ttf#Segoe UI Emoji";
                     break;
                 default:
-                    this["EmojiOnlyThemeFontFamily"] = "ms-appx:///Assets/Emoji/apple.ttf#Segoe UI Emoji";
-                    xamlAutoFontFamily.Prepend("ms-appx:///Assets/Emoji/apple.ttf#Segoe UI Emoji", comma);
+                    XamlAutoFontFamily = "ms-appx:///Assets/Emoji/apple.ttf#Segoe UI Emoji";
                     break;
             }
 
-            XamlAutoFontFamily = xamlAutoFontFamily.ToString();
+            if (xamlAutoFontFamilyDefault)
+            {
+                this["EmojiTextThemeFontFamily"] = new FontFamily(XamlAutoFontFamily + comma + xamlAutoFontFamilyValue);
+            }
+            else
+            {
+                XamlAutoFontFamily += comma + xamlAutoFontFamilyValue;
+                this["EmojiTextThemeFontFamily"] = new FontFamily(XamlAutoFontFamily + comma + xamlAutoFontFamilyValue);
+            }
 
-            this["EmojiThemeFontFamily"] = new FontFamily(xamlAutoFontFamily.ToString());
-            this["ContentControlThemeFontFamily"] = new FontFamily(xamlAutoFontFamily.ToString());
-
-            xamlAutoFontFamily.Prepend("ms-appx:///Assets/Fonts/Telegram.ttf#Telegram", comma);
-
-            this["EmojiThemeFontFamilyWithSymbols"] = new FontFamily(xamlAutoFontFamily.ToString());
+            this["ContentControlThemeFontFamily"] = new FontFamily(XamlAutoFontFamily);
+            this["EmojiThemeFontFamily"] = new FontFamily(XamlAutoFontFamily);
+            this["EmojiThemeFontFamilyWithSymbols"] = new FontFamily(XamlAutoFontFamily + comma + "ms-appx:///Assets/Fonts/Telegram.ttf#Telegram");
+            this["EmojiThemeFontFamilyWithRounded"] = new FontFamily(XamlAutoFontFamily + comma + "ms-appx:///Assets/Fonts/Nunito.ttf#Nunito" + comma + "ms-appx:///Assets/Fonts/Telegram.ttf#Telegram");
+            this["EmojiTextThemeFontFamily"] = new FontFamily(XamlAutoFontFamily + comma + xamlAutoFontFamilyValue);
         }
 
         public string XamlAutoFontFamily { get; private set; }
@@ -227,6 +225,13 @@ namespace Telegram.Common
 
                     var accent = settings.AccentColor.ToColor();
                     var outgoing = settings.OutgoingMessageAccentColor.ToColor();
+                    //var outgoing = settings.OutgoingMessageFill switch
+                    //{
+                    //    //BackgroundFillSolid solid => solid.Color.ToColor(),
+                    //    BackgroundFillGradient gradient => gradient.TopColor.ToColor(),
+                    //    BackgroundFillFreeformGradient freeform => freeform.Colors[0].ToColor(),
+                    //    _ => settings.OutgoingMessageAccentColor.ToColor()
+                    //};
 
                     var info = ThemeAccentInfo.FromAccent(tint, accent, outgoing);
                     ThemeOutgoing.Update(info.Parent, info.Values);
@@ -384,7 +389,7 @@ namespace Telegram.Common
                 {
                     if (item.Value is AccentShade or Color)
                     {
-                        Color value;
+                        Color value = default;
                         if (item.Value is AccentShade shade)
                         {
                             value = GetShade(shade);

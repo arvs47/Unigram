@@ -10,14 +10,12 @@ using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels.Chats;
 using Windows.Foundation;
-using Windows.System;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Shapes;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Controls.Messages
 {
@@ -101,7 +99,7 @@ namespace Telegram.Controls.Messages
                 Icon.Source = new ReactionFileSource(viewModel.ClientService, reaction.Tag)
                 {
                     UseCenterAnimation = true,
-                    IsUnique = true
+                    IsAnimated = false
                 };
             }
         }
@@ -124,9 +122,6 @@ namespace Telegram.Controls.Messages
             //}
             //else if (interaction.TotalCount > interaction.RecentSenderIds.Count)
             //{
-            Count ??= GetTemplateChild(nameof(Count)) as AnimatedTextBlock;
-            Count.Visibility = Visibility.Visible;
-
             var builder = new StringBuilder(tag.Label);
             if (builder.Length > 0)
             {
@@ -173,6 +168,7 @@ namespace Telegram.Controls.Messages
         {
             LayoutRoot = GetTemplateChild(nameof(LayoutRoot)) as Grid;
             Icon = GetTemplateChild(nameof(Icon)) as CustomEmojiIcon;
+            Count = GetTemplateChild(nameof(Count)) as AnimatedTextBlock;
 
             if (_reaction != null)
             {

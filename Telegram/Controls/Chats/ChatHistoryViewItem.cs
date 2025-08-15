@@ -6,8 +6,8 @@
 //
 using Telegram.Common;
 using Telegram.Controls.Messages;
-using Telegram.Services;
-using Telegram.Td.Api;
+using Telegram.ViewModels;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation;
 using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
@@ -26,6 +26,7 @@ namespace Telegram.Controls.Chats
         ServiceGift,
         ServiceGiftCode,
         ServiceUpgradedGift,
+        ServiceAccountInfo,
     }
 
     public partial class ChatHistoryViewItem : ListViewItemEx
@@ -49,52 +50,44 @@ namespace Telegram.Controls.Chats
         {
             return new ChatListViewAutomationPeer(this);
         }
-    }
 
-    public partial class AccessibleChatListViewItem : ListViewItem
-    {
-        private readonly IClientService _clientService;
+        private double _paddingTop;
+        private double _paddingBottom;
 
-        public AccessibleChatListViewItem()
+        public void UpdatePadding(double top, double bottom)
         {
+            var newTop = top >= 0 ? top : _paddingTop;
+            var newBottom = bottom >= 0 ? bottom : _paddingBottom;
 
-        }
+            if (_paddingTop != newTop || _paddingBottom != newBottom)
+            {
+                _paddingTop = newTop;
+                _paddingBottom = newBottom;
 
-        public AccessibleChatListViewItem(IClientService clientService)
-        {
-            _clientService = clientService;
-        }
-
-        protected override AutomationPeer OnCreateAutomationPeer()
-        {
-            return new ChatListViewAutomationPeer(this, _clientService);
+                Padding = new Thickness(0, newTop, 0, newBottom);
+            }
         }
     }
 
     public partial class TableAccessibleChatListViewItem : TableListViewItem
     {
-        private readonly IClientService _clientService;
+        private readonly ListViewBase _parent;
 
-        public TableAccessibleChatListViewItem()
+        public TableAccessibleChatListViewItem(ListViewBase parent)
         {
-
-        }
-
-        public TableAccessibleChatListViewItem(IClientService clientService)
-        {
-            _clientService = clientService;
+            _parent = parent;
         }
 
         protected override AutomationPeer OnCreateAutomationPeer()
         {
-            return new ChatListViewAutomationPeer(this, _clientService);
+            return new ChatListViewAutomationPeer(_parent, this);
         }
     }
 
     public partial class ChatListViewAutomationPeer : ListViewItemAutomationPeer
     {
+        private readonly ListViewBase _parent;
         private readonly ListViewItem _owner;
-        private readonly IClientService _clientService;
 
         public ChatListViewAutomationPeer(ListViewItem owner)
             : base(owner)
@@ -102,11 +95,11 @@ namespace Telegram.Controls.Chats
             _owner = owner;
         }
 
-        public ChatListViewAutomationPeer(ListViewItem owner, IClientService clientService)
+        public ChatListViewAutomationPeer(ListViewBase parent, ListViewItem owner)
             : base(owner)
         {
+            _parent = parent;
             _owner = owner;
-            _clientService = clientService;
         }
 
         protected override string GetNameCore()
@@ -135,46 +128,41 @@ namespace Telegram.Controls.Chats
                 }
             }
 
+            var content = _parent?.ItemFromContainer(_owner);
+            if (content is MessageWithOwner messageWithOwner)
+            {
+                return Automation.GetSummaryWithName(messageWithOwner, true);
+            }
+
             return base.GetNameCore();
         }
     }
 
     public partial class ChatGridViewItem : GridViewItem
     {
-        private readonly IClientService _clientService;
+        private readonly ListViewBase _parent;
 
-        public ChatGridViewItem()
+        public ChatGridViewItem(ListViewBase parent)
         {
-
-        }
-
-        public ChatGridViewItem(IClientService clientService)
-        {
-            _clientService = clientService;
+            _parent = parent;
         }
 
         protected override AutomationPeer OnCreateAutomationPeer()
         {
-            return new ChatGridViewAutomationPeer(this, _clientService);
+            return new ChatGridViewAutomationPeer(_parent, this);
         }
     }
 
     public partial class ChatGridViewAutomationPeer : GridViewItemAutomationPeer
     {
+        private readonly ListViewBase _parent;
         private readonly ChatGridViewItem _owner;
-        private readonly IClientService _clientService;
 
-        public ChatGridViewAutomationPeer(ChatGridViewItem owner)
+        public ChatGridViewAutomationPeer(ListViewBase parent, ChatGridViewItem owner)
             : base(owner)
         {
+            _parent = parent;
             _owner = owner;
-        }
-
-        public ChatGridViewAutomationPeer(ChatGridViewItem owner, IClientService clientService)
-            : base(owner)
-        {
-            _owner = owner;
-            _clientService = clientService;
         }
 
         protected override string GetNameCore()
@@ -191,9 +179,11 @@ namespace Telegram.Controls.Chats
             {
                 return child.GetAutomationName() ?? base.GetNameCore();
             }
-            else if (_owner.Content is Message message && _clientService != null)
+
+            var content = _parent.ItemFromContainer(_owner);
+            if (content is MessageWithOwner messageWithOwner)
             {
-                return Automation.GetDescription(_clientService, message);
+                return Automation.GetSummaryWithName(messageWithOwner, true);
             }
 
             return base.GetNameCore();

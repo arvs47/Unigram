@@ -36,6 +36,7 @@ namespace Telegram.Services
         #region Chats related
 
         void SetMuteFor(Chat chat, int muteFor, XamlRoot xamlRoot);
+        void SetMuteFor(ForumTopic topic, int muteFor, XamlRoot xamlRoot);
 
         #endregion
     }
@@ -716,9 +717,9 @@ namespace Telegram.Services
             {
                 launch = string.Format(CultureInfo.InvariantCulture, "{0}&amp;saved_messages_topic_id={1}", launch, messageTopicSavedMessages.SavedMessagesTopicId);
             }
-            else if (message.TopicId is MessageTopicFeedbackChat messageTopicFeedbackChat)
+            else if (message.TopicId is MessageTopicDirectMessages messageTopicDirectMessagesChat)
             {
-                launch = string.Format(CultureInfo.InvariantCulture, "{0}&amp;feedback_chat_topic_id={1}", launch, messageTopicFeedbackChat.FeedbackChatTopicId);
+                launch = string.Format(CultureInfo.InvariantCulture, "{0}&amp;feedback_chat_topic_id={1}", launch, messageTopicDirectMessagesChat.DirectMessagesChatTopicId);
             }
 
             return launch;
@@ -753,8 +754,8 @@ namespace Telegram.Services
 
                     // TODO: topic id
 
-                    var replyToMessage = data.TryGetValue("msg_id", out string msg_id) && long.TryParse(msg_id, out long messageId) ? new InputMessageReplyToMessage(messageId, null) : null;
-                    var response = await _clientService.SendAsync(new SendMessage(chat.Id, 0, replyToMessage, new MessageSendOptions(0, false, true, false, false, 0, false, null, 0, 0, false), null, new InputMessageText(formatted, null, false)));
+                    var replyToMessage = data.TryGetValue("msg_id", out string msg_id) && long.TryParse(msg_id, out long messageId) ? new InputMessageReplyToMessage(messageId, null, 0) : null;
+                    var response = await _clientService.SendAsync(new SendMessage(chat.Id, 0, replyToMessage, new MessageSendOptions(0, null, false, true, false, false, 0, false, null, 0, 0, false), null, new InputMessageText(formatted, null, false)));
 
                     if (chat.Type is ChatTypePrivate && chat.LastMessage != null)
                     {
@@ -856,6 +857,43 @@ namespace Telegram.Services
                 settings.MuteFor = value;
 
                 _clientService.Send(new SetChatNotificationSettings(chat.Id, settings));
+
+                if (xamlRoot == null)
+                {
+                    return;
+                }
+
+                if (value == 0)
+                {
+                    ToastPopup.Show(xamlRoot, Strings.NotificationsUnmutedHint, ToastPopupIcon.Unmute);
+                }
+                else if (value >= 366 * 24 * 60 * 60)
+                {
+                    ToastPopup.Show(xamlRoot, Strings.NotificationsMutedHint, ToastPopupIcon.Mute);
+                }
+                else
+                {
+                    ToastPopup.Show(xamlRoot, string.Format(Strings.NotificationsMutedForHint, Locale.FormatMuteFor(value)), ToastPopupIcon.MuteFor);
+                }
+            }
+        }
+
+        public void SetMuteFor(ForumTopic topic, int value, XamlRoot xamlRoot)
+        {
+            if (_clientService.TryGetChat(topic.Info.ChatId, out Chat chat) && _settings.Notifications.TryGetScope(chat, out ScopeNotificationSettings scope))
+            {
+                var settings = topic.NotificationSettings.Clone();
+
+                var useDefault = value == scope.MuteFor || (value >= 366 * 24 * 60 * 60 && scope.MuteFor >= 366 * 24 * 60 * 60);
+                if (useDefault)
+                {
+                    value = scope.MuteFor;
+                }
+
+                settings.UseDefaultMuteFor = useDefault;
+                settings.MuteFor = value;
+
+                _clientService.Send(new SetForumTopicNotificationSettings(chat.Id, topic.Info.MessageThreadId, settings));
 
                 if (xamlRoot == null)
                 {

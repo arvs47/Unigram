@@ -4,8 +4,6 @@
 // Distributed under the GNU General Public License v3.0. (See accompanying
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
-using System;
-using System.Globalization;
 using Telegram.Common;
 using Telegram.Converters;
 using Telegram.Td.Api;
@@ -13,7 +11,6 @@ using Telegram.ViewModels;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Documents;
-using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Shapes;
 
 namespace Telegram.Controls.Messages.Content
@@ -32,6 +29,7 @@ namespace Telegram.Controls.Messages.Content
 
         #region InitializeComponent
 
+        private HyperlinkButton Button;
         private ImageView Texture;
         private ProfilePicture PinPhoto;
         private Path PinDot;
@@ -45,6 +43,7 @@ namespace Telegram.Controls.Messages.Content
 
         protected override void OnApplyTemplate()
         {
+            Button = GetTemplateChild(nameof(Button)) as HyperlinkButton;
             Texture = GetTemplateChild(nameof(Texture)) as ImageView;
             PinPhoto = GetTemplateChild(nameof(PinPhoto)) as ProfilePicture;
             PinDot = GetTemplateChild(nameof(PinDot)) as Path;
@@ -54,7 +53,7 @@ namespace Telegram.Controls.Messages.Content
             LivePeriod = GetTemplateChild(nameof(LivePeriod)) as TextBlock;
             LiveRing = GetTemplateChild(nameof(LiveRing)) as SelfDestructTimer;
 
-            Texture.Click += Button_Click;
+            Button.Click += Button_Click;
 
             _templateApplied = true;
 
@@ -66,8 +65,6 @@ namespace Telegram.Controls.Messages.Content
 
         #endregion
 
-        private string _prevUrl;
-
         public void UpdateMessage(MessageViewModel message)
         {
             _message = message;
@@ -78,20 +75,9 @@ namespace Telegram.Controls.Messages.Content
                 return;
             }
 
-            var width = 320 * XamlRoot.RasterizationScale;
-            var height = 200 * XamlRoot.RasterizationScale;
-
-            var latitude = location.Location.Latitude.ToString(CultureInfo.InvariantCulture);
-            var longitude = location.Location.Longitude.ToString(CultureInfo.InvariantCulture);
-
-            var nextUrl = string.Format("https://dev.virtualearth.net/REST/v1/Imagery/Map/Road/{0},{1}/{2}?mapSize={3:F0},{4:F0}&key={5}",
-                latitude, longitude, 15, width, height, Constants.BingMapsApiKey);
-
-            if (nextUrl != _prevUrl)
-            {
-                Texture.Constraint = message;
-                Texture.Source = new BitmapImage(new Uri(_prevUrl = nextUrl));
-            }
+            Texture.Constraint = message;
+            Texture.XamlRoot = XamlRoot;
+            Texture.SetSource(message.ClientService, location.Location, 320, 200, message.ChatId);
 
             if (location.LivePeriod > 0)
             {

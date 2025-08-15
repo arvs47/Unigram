@@ -84,6 +84,20 @@ namespace Telegram.Td.Api
             return last >= 24 * 60 * 7 - 1;
         }
 
+        public static string ToValue(this SuggestedPostPrice price)
+        {
+            if (price is SuggestedPostPriceStar priceStar)
+            {
+                return string.Format(Strings.StarsCountX, priceStar.StarCount);
+            }
+            else if (price is SuggestedPostPriceTon priceTon)
+            {
+                return string.Format(Strings.TonCountX, priceTon.ToncoinCentCount / 100d);
+            }
+
+            return string.Format(Strings.StarsCountX, 0);
+        }
+
         public static string CommissionPercent(this AffiliateProgramParameters parameters)
         {
             return (parameters.CommissionPerMille / 10d).ToString("0.##") + "%";
@@ -203,7 +217,7 @@ namespace Telegram.Td.Api
             return string.Equals(x.ToString(), y.ToString());
         }
 
-        public static bool AreTheSame(this SetChatFeedbackGroup x, SetChatFeedbackGroup y)
+        public static bool AreTheSame(this SetChatDirectMessagesGroup x, SetChatDirectMessagesGroup y)
         {
             if (x == null || y == null)
             {
@@ -378,10 +392,10 @@ namespace Telegram.Td.Api
             {
                 return oldSavedMessages.SavedMessagesTopicId == newSavedMessages.SavedMessagesTopicId;
             }
-            else if (x is MessageTopicFeedbackChat oldFeedbackChat
-                && y is MessageTopicFeedbackChat newFeedbackChat)
+            else if (x is MessageTopicDirectMessages oldDirectMessagesChat
+                && y is MessageTopicDirectMessages newDirectMessagesChat)
             {
-                return oldFeedbackChat.FeedbackChatTopicId == newFeedbackChat.FeedbackChatTopicId;
+                return oldDirectMessagesChat.DirectMessagesChatTopicId == newDirectMessagesChat.DirectMessagesChatTopicId;
             }
 
             return false;
@@ -397,9 +411,9 @@ namespace Telegram.Td.Api
             return messageTopic is MessageTopicForum forum && forum.ForumTopicId == forumTopicId;
         }
 
-        public static bool IsFeedbackChat(this MessageTopic messageTopic, long feedbackChatTopicId)
+        public static bool IsDirectMessagesChat(this MessageTopic messageTopic, long directMessagesChatTopicId)
         {
-            return messageTopic is MessageTopicFeedbackChat feedbackChat && feedbackChat.FeedbackChatTopicId == feedbackChatTopicId;
+            return messageTopic is MessageTopicDirectMessages directMessagesChat && directMessagesChat.DirectMessagesChatTopicId == directMessagesChatTopicId;
         }
 
         public static MessageTopic TopicIdNotGeneral(this Message message)
@@ -422,9 +436,9 @@ namespace Telegram.Td.Api
             return new MessageTopicSavedMessages(topic.Id);
         }
 
-        public static MessageTopic ToId(this FeedbackChatTopic topic)
+        public static MessageTopic ToId(this DirectMessagesChatTopic topic)
         {
-            return new MessageTopicFeedbackChat(topic.Id);
+            return new MessageTopicDirectMessages(topic.Id);
         }
 
         public static bool AreTheSame(this MessageSelfDestructType x, MessageSelfDestructType y)
@@ -913,6 +927,25 @@ namespace Telegram.Td.Api
             return x.Id == y.Id && x.ChatId == y.ChatId;
         }
 
+        public static bool AreTheSame(this SuggestedPostPrice x, SuggestedPostPrice y)
+        {
+            if (x == null || y == null)
+            {
+                return x == y;
+            }
+
+            if (x is SuggestedPostPriceStar xStar && y is SuggestedPostPriceStar yStar)
+            {
+                return xStar.StarCount == yStar.StarCount;
+            }
+            else if (x is SuggestedPostPriceTon xTon && y is SuggestedPostPriceTon yTon)
+            {
+                return xTon.ToncoinCentCount == yTon.ToncoinCentCount;
+            }
+
+            return false;
+        }
+
         public static IEnumerable<FormattedText> Split(this FormattedText text, long maxLength)
         {
             int count = (int)Math.Ceiling(text.Text.Length / (double)maxLength);
@@ -1059,9 +1092,9 @@ namespace Telegram.Td.Api
             }
         }
 
-        public static Photo GetPhoto(this Message message)
+        public static Photo GetPhoto(this MessageContent content)
         {
-            switch (message.Content)
+            switch (content)
             {
                 case MessageGame game:
                     return game.Game.Photo;
@@ -1138,6 +1171,8 @@ namespace Telegram.Td.Api
                     break;
                 case MessageSticker sticker:
                     return (sticker.Sticker.StickerValue, null, null);
+                case MessageAnimatedEmoji animatedEmoji:
+                    return (animatedEmoji.AnimatedEmoji.Sticker?.StickerValue, null, null);
                 case MessageText text:
                     return text.LinkPreview?.Type switch
                     {
@@ -1318,6 +1353,8 @@ namespace Telegram.Td.Api
                     return photo.Photo.GetBig()?.Photo;
                 case MessageSticker sticker:
                     return sticker.Sticker.StickerValue;
+                case MessageAnimatedEmoji animatedEmoji:
+                    return animatedEmoji.AnimatedEmoji.Sticker?.StickerValue;
                 case MessageText text:
                     return text.LinkPreview?.Type switch
                     {
@@ -1375,6 +1412,8 @@ namespace Telegram.Td.Api
                     return animation.Animation.AnimationValue.Local.IsDownloadingCompleted;
                 case MessageSticker sticker:
                     return sticker.Sticker.Format is StickerFormatTgs or StickerFormatWebm && sticker.Sticker.StickerValue.Local.IsDownloadingCompleted;
+                case MessageAnimatedEmoji animatedEmoji:
+                    return animatedEmoji.AnimatedEmoji.Sticker?.Format is StickerFormatTgs or StickerFormatWebm && animatedEmoji.AnimatedEmoji.Sticker.StickerValue.Local.IsDownloadingCompleted;
                 case MessageVideoNote videoNote:
                     return videoNote.VideoNote.Video.Local.IsDownloadingCompleted;
                 case MessageGame game:
@@ -1493,6 +1532,8 @@ namespace Telegram.Td.Api
                     return game.Game.Animation?.Thumbnail;
                 case MessageSticker sticker:
                     return sticker.Sticker.Thumbnail;
+                case MessageAnimatedEmoji animatedEmoji:
+                    return animatedEmoji.AnimatedEmoji.Sticker?.Thumbnail;
                 case MessageText text:
                     return text.LinkPreview?.GetThumbnail();
                 case MessageVideo video:
@@ -1567,6 +1608,11 @@ namespace Telegram.Td.Api
             };
         }
 
+        public static FormattedText Clone(this FormattedText text)
+        {
+            return new FormattedText(text.Text, text.Entities.ToList());
+        }
+
         public static FormattedText ReplaceSpoilers(this FormattedText text, bool singleLine = true)
         {
             if (text.Entities?.Count > 0)
@@ -1619,6 +1665,18 @@ namespace Telegram.Td.Api
             }
 
             return new FormattedText(sticker.Emoji, Array.Empty<TextEntity>());
+        }
+
+        public static bool HasCaption(this Message message)
+        {
+            var caption = message.Content.GetCaption();
+            return caption != null && !string.IsNullOrEmpty(caption.Text);
+        }
+
+        public static bool HasCaption(this MessageWithOwner message)
+        {
+            var caption = message.Content.GetCaption();
+            return caption != null && !string.IsNullOrEmpty(caption.Text);
         }
 
         public static bool HasCaption(this MessageContent content)
@@ -1709,9 +1767,9 @@ namespace Telegram.Td.Api
             return linkPreview.SiteName.Length > 0 || linkPreview.Title.Length > 0 || linkPreview.Author.Length > 0 || linkPreview.Description?.Text.Length > 0;
         }
 
-        public static bool IsService(this Message message)
+        public static bool IsService(this MessageContent content)
         {
-            switch (message.Content)
+            switch (content)
             {
                 case MessageAlbum:
                 case MessageAnimatedEmoji:
@@ -1720,6 +1778,7 @@ namespace Telegram.Td.Api
                 case MessageBigEmoji:
                 case MessageCall:
                 case MessageGroupCall:
+                case MessageChecklist:
                 case MessageContact:
                 case MessageDice:
                 case MessageDocument:
@@ -1806,6 +1865,32 @@ namespace Telegram.Td.Api
             }
         }
 
+        public static bool AreOnTheSameDay(this MessageViewModel x, MessageViewModel y)
+        {
+            var xdate = Formatter.ToLocalTime(x.GetDate());
+            var ydate = Formatter.ToLocalTime(y.GetDate());
+
+            return xdate.Date == ydate.Date;
+        }
+
+        public static int GetDate(this MessageViewModel item)
+        {
+            if (item.SchedulingState is MessageSchedulingStateSendAtDate sendAtDate)
+            {
+                return sendAtDate.SendDate;
+            }
+            else if (item.SchedulingState is MessageSchedulingStateSendWhenVideoProcessed sendWhenVideoProcessed)
+            {
+                return sendWhenVideoProcessed.SendDate;
+            }
+            else if (item.SchedulingState is MessageSchedulingStateSendWhenOnline)
+            {
+                return int.MinValue;
+            }
+
+            return item.Date;
+        }
+
         public static bool IsUnread(this Chat chat)
         {
             if (chat.IsMarkedAsUnread)
@@ -1829,17 +1914,13 @@ namespace Telegram.Td.Api
 
         public static string GetTitle(this Audio audio)
         {
-            var performer = string.IsNullOrEmpty(audio.Performer) ? null : audio.Performer;
-            var title = string.IsNullOrEmpty(audio.Title) ? null : audio.Title;
-
-            if (string.IsNullOrEmpty(audio.Performer)
-                || string.IsNullOrEmpty(audio.Title))
+            if (string.IsNullOrEmpty(audio.Performer) || string.IsNullOrEmpty(audio.Title))
             {
                 return audio.FileName;
             }
             else
             {
-                return $"{performer} - {title}";
+                return $"{audio.Performer} - {audio.Title}";
             }
         }
 
@@ -1961,6 +2042,93 @@ namespace Telegram.Td.Api
             }
 
             return null;
+        }
+
+        public static bool AreTheSame(this NewChatPrivacySettings x, NewChatPrivacySettings y)
+        {
+            if (x == null || y == null)
+            {
+                return x == y;
+            }
+
+            return x.AllowNewChatsFromUnknownUsers == y.AllowNewChatsFromUnknownUsers
+                && x.IncomingPaidMessageStarCount == y.IncomingPaidMessageStarCount;
+        }
+
+        public static bool AreTheSame(this UserPrivacySettingRules x, UserPrivacySettingRules y)
+        {
+            return (x, y) switch
+            {
+                (null, null) => true,
+                (null, _) or (_, null) => false,
+                _ when IsEmptyOrSingleDisallowAll(x) && IsEmptyOrSingleDisallowAll(y) => true,
+                _ => x.Rules.Count == y.Rules.Count &&
+                     CompareOrderedRules(x.Rules, y.Rules)
+            };
+        }
+
+        private static bool IsEmptyOrSingleDisallowAll(UserPrivacySettingRules rules)
+        {
+            return rules.Rules.Count == 0 ||
+                   (rules.Rules.Count == 1 && rules.Rules[0] is UserPrivacySettingRuleRestrictAll);
+        }
+
+        private static bool CompareOrderedRules(IList<UserPrivacySettingRule> xRules, IList<UserPrivacySettingRule> yRules)
+        {
+            var xSorted = GetOrderedRules(xRules);
+            var ySorted = GetOrderedRules(yRules);
+
+            for (int i = 0; i < xSorted.Count; i++)
+            {
+                if (!xSorted[i].AreTheSame(ySorted[i]))
+                    return false;
+            }
+            return true;
+        }
+
+        private static IList<UserPrivacySettingRule> GetOrderedRules(IList<UserPrivacySettingRule> rules)
+        {
+            return rules.OrderBy(x => x switch
+            {
+                UserPrivacySettingRuleAllowAll => 0,
+                UserPrivacySettingRuleAllowBots => 1,
+                UserPrivacySettingRuleAllowChatMembers => 2,
+                UserPrivacySettingRuleAllowContacts => 3,
+                UserPrivacySettingRuleAllowPremiumUsers => 4,
+                UserPrivacySettingRuleAllowUsers => 5,
+                UserPrivacySettingRuleRestrictAll => 6,
+                UserPrivacySettingRuleRestrictBots => 7,
+                UserPrivacySettingRuleRestrictChatMembers => 8,
+                UserPrivacySettingRuleRestrictContacts => 9,
+                UserPrivacySettingRuleRestrictUsers => 10,
+                _ => -1
+            }).ToArray();
+        }
+
+        public static bool AreTheSame(this UserPrivacySettingRule x, UserPrivacySettingRule y)
+        {
+            return (x, y) switch
+            {
+                (UserPrivacySettingRuleAllowAll, UserPrivacySettingRuleAllowAll) => true,
+                (UserPrivacySettingRuleAllowBots, UserPrivacySettingRuleAllowBots) => true,
+                (UserPrivacySettingRuleAllowContacts, UserPrivacySettingRuleAllowContacts) => true,
+                (UserPrivacySettingRuleAllowPremiumUsers, UserPrivacySettingRuleAllowPremiumUsers) => true,
+                (UserPrivacySettingRuleRestrictAll, UserPrivacySettingRuleRestrictAll) => true,
+                (UserPrivacySettingRuleRestrictBots, UserPrivacySettingRuleRestrictBots) => true,
+                (UserPrivacySettingRuleRestrictContacts, UserPrivacySettingRuleRestrictContacts) => true,
+
+                (UserPrivacySettingRuleAllowChatMembers xAllow, UserPrivacySettingRuleAllowChatMembers yAllow)
+                    => xAllow.ChatIds.OrderBy(x => x).SequenceEqual(yAllow.ChatIds.OrderBy(x => x)),
+                (UserPrivacySettingRuleRestrictChatMembers xRestrict, UserPrivacySettingRuleRestrictChatMembers yRestrict)
+                    => xRestrict.ChatIds.OrderBy(x => x).SequenceEqual(yRestrict.ChatIds.OrderBy(x => x)),
+
+                (UserPrivacySettingRuleAllowUsers xAllow, UserPrivacySettingRuleAllowUsers yAllow)
+                    => xAllow.UserIds.OrderBy(x => x).SequenceEqual(yAllow.UserIds.OrderBy(x => x)),
+                (UserPrivacySettingRuleRestrictUsers xRestrict, UserPrivacySettingRuleRestrictUsers yRestrict)
+                    => xRestrict.UserIds.OrderBy(x => x).SequenceEqual(yRestrict.UserIds.OrderBy(x => x)),
+
+                _ => false
+            };
         }
 
         public static bool AreTheSame(this EmojiStatus x, EmojiStatus y)
@@ -2154,6 +2322,11 @@ namespace Telegram.Td.Api
 
         public static bool AreTheSame(this GiftSettings x, GiftSettings y)
         {
+            if (x == null || y == null)
+            {
+                return x == y;
+            }
+
             return x.AcceptedGiftTypes.LimitedGifts == y.AcceptedGiftTypes.LimitedGifts
                 && x.AcceptedGiftTypes.PremiumSubscription == y.AcceptedGiftTypes.PremiumSubscription
                 && x.AcceptedGiftTypes.UnlimitedGifts == y.AcceptedGiftTypes.UnlimitedGifts
@@ -2244,6 +2417,31 @@ namespace Telegram.Td.Api
             return sender.ParticipantId.AreTheSame(compare.ParticipantId);
         }
 
+        public static bool AreTheSame(this ChatNotificationSettings x, ChatNotificationSettings y)
+        {
+            if (x == null || y == null)
+            {
+                return x == y;
+            }
+
+            return x.DisableMentionNotifications == y.DisableMentionNotifications
+                && x.DisablePinnedMessageNotifications == y.DisablePinnedMessageNotifications
+                && x.MuteFor == y.MuteFor
+                && x.MuteStories == y.MuteStories
+                && x.ShowPreview == y.ShowPreview
+                && x.ShowStoryPoster == y.ShowStoryPoster
+                && x.SoundId == y.SoundId
+                && x.StorySoundId == y.StorySoundId
+                && x.UseDefaultDisableMentionNotifications == y.UseDefaultDisableMentionNotifications
+                && x.UseDefaultDisablePinnedMessageNotifications == y.UseDefaultDisablePinnedMessageNotifications
+                && x.UseDefaultMuteFor == y.UseDefaultMuteFor
+                && x.UseDefaultMuteStories == y.UseDefaultMuteStories
+                && x.UseDefaultShowPreview == y.UseDefaultShowPreview
+                && x.UseDefaultShowStoryPoster == y.UseDefaultShowStoryPoster
+                && x.UseDefaultSound == y.UseDefaultSound
+                && x.UseDefaultStorySound == y.UseDefaultStorySound;
+        }
+
         public static bool IsUser(this MessageSender sender, long userId)
         {
             return sender is MessageSenderUser user && user.UserId == userId;
@@ -2269,6 +2467,40 @@ namespace Telegram.Td.Api
         }
 
         public static bool IsSaved(this Message message, long savedMessagesId)
+        {
+            if (message.ForwardInfo?.Origin is MessageOriginUser)
+            {
+                return message.ForwardInfo.Source != null;
+            }
+            else if (message.ForwardInfo?.Origin is MessageOriginChat)
+            {
+                return message.ForwardInfo.Source != null;
+            }
+            else if (message.ForwardInfo?.Origin is MessageOriginChannel originChannel)
+            {
+                // TODO: not fully correct
+                if (message.ChatId == savedMessagesId)
+                {
+                    return message.ForwardInfo.Source != null;
+                }
+
+                return message.ForwardInfo.Source != null
+                    && message.ForwardInfo.Source.ChatId == originChannel.ChatId
+                    && message.ForwardInfo.Source.MessageId == originChannel.MessageId;
+            }
+            else if (message.ForwardInfo?.Origin is MessageOriginHiddenUser)
+            {
+                return message.ChatId == savedMessagesId;
+            }
+            else if (message.ImportInfo != null)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool IsSaved(this MessageViewModel message, long savedMessagesId)
         {
             if (message.ForwardInfo?.Origin is MessageOriginUser)
             {
@@ -2820,6 +3052,7 @@ namespace Telegram.Td.Api
                 or ChatMemberStatusRestricted { Permissions.CanAddLinkPreviews: true };
         }
 
+        // Currently used only by ChatTextBox, if used somewhere TODO should be fixed
         public static bool CanSendOtherMessages(this Chat chat, IClientService clientService)
         {
             var status = clientService.GetChatMemberStatus(chat, out bool channel);
@@ -2827,7 +3060,8 @@ namespace Telegram.Td.Api
             {
                 return false;
             }
-            else if (status is ChatMemberStatusMember)
+            // TODO: check if group is accessible of Left?
+            else if (status is ChatMemberStatusMember or ChatMemberStatusLeft)
             {
                 return chat.Permissions.CanSendOtherMessages;
             }
@@ -2862,13 +3096,14 @@ namespace Telegram.Td.Api
                 or ChatMemberStatusRestricted { Permissions.CanSendPolls: true };
         }
 
-        public static bool IsFeedbackChatAdministrator(this Chat chat, IClientService clientService)
+        // TODO: remove once exposed by TDLib
+        public static bool IsDirectMessagesChatAdministrator(this Chat chat, IClientService clientService)
         {
             if (clientService.TryGetSupergroup(chat, out Supergroup supergroup) && clientService.TryGetSupergroupFull(chat, out SupergroupFullInfo fullInfo))
             {
-                if (supergroup.IsFeedbackGroup && clientService.TryGetChat(fullInfo.FeedbackChatId, out chat))
+                if (supergroup.IsDirectMessagesGroup && clientService.TryGetChat(fullInfo.DirectMessagesChatId, out chat))
                 {
-                    clientService.TryGetChat(fullInfo.FeedbackChatId, out chat);
+                    clientService.TryGetChat(fullInfo.DirectMessagesChatId, out chat);
                 }
 
                 var status = clientService.GetChatMemberStatus(chat, out bool channel);
@@ -2885,22 +3120,16 @@ namespace Telegram.Td.Api
         {
             if (clientService.TryGetSupergroup(chat, out Supergroup supergroup))
             {
-                if (supergroup.HasForumTabs)
+                if (supergroup.HasForumTabs || (supergroup.IsForum && !chat.ViewAsTopics && SettingsService.Current.Diagnostics.ForumTabsDebug))
                 {
                     isForum = true;
                     return true;
                 }
 
-                if (supergroup.IsFeedbackGroup && clientService.TryGetSupergroupFull(chat, out SupergroupFullInfo fullInfo) && clientService.TryGetChat(fullInfo.FeedbackChatId, out chat))
-                {
-                    clientService.TryGetChat(fullInfo.FeedbackChatId, out chat);
-                }
-
-                var status = clientService.GetChatMemberStatus(chat, out bool channel);
-                if (status is ChatMemberStatusAdministrator administrator)
+                if (supergroup.IsDirectMessagesGroup)
                 {
                     isForum = false;
-                    return administrator.Rights.CanPostMessages;
+                    return supergroup.IsAdministeredDirectMessagesGroup;
                 }
             }
 

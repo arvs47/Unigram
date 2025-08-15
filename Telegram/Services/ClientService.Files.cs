@@ -77,6 +77,7 @@ namespace Telegram.Services
 
         private readonly HashSet<int> _canceledDownloads = new();
         private readonly HashSet<string> _completedDownloads = new();
+        private readonly object _downloadsLock = new();
 
         public Task<File> GetFileAsync(int fileId)
         {
@@ -113,7 +114,7 @@ namespace Telegram.Services
                 }
                 catch (System.IO.FileNotFoundException)
                 {
-                    Send(new DeleteFileW(file.Id));
+                    Send(new DeleteFile(file.Id));
                 }
                 catch { }
 
@@ -148,7 +149,10 @@ namespace Telegram.Services
                     var permanent = await Future.GetFileAsync(file.Remote.UniqueId);
                     if (permanent == null)
                     {
-                        _completedDownloads.Add(file.Remote.UniqueId);
+                        lock (_downloadsLock)
+                        {
+                            _completedDownloads.Add(file.Remote.UniqueId);
+                        }
 
                         var source = await StorageFile.GetFileFromPathAsync(file.Local.Path);
                         if (Future.CheckAccess(source))
@@ -157,7 +161,15 @@ namespace Telegram.Services
                         }
                         else
                         {
-                            var destination = await Future.CreateFileAsync(source.Name);
+                            var sourceName = source.Name;
+
+                            var response = await SendAsync(new GetSuggestedFileName(file.Id, string.Empty));
+                            if (response is Text text)
+                            {
+                                sourceName = text.TextValue;
+                            }
+
+                            var destination = await Future.CreateFileAsync(sourceName);
 
                             await source.CopyAndReplaceAsync(destination);
                             Future.AddOrReplace(file.Remote.UniqueId, destination);
@@ -205,20 +217,31 @@ namespace Telegram.Services
                 && file.Remote.IsUploadingCompleted
                 && Future.Contains(file.Remote.UniqueId, true))
             {
-                if (_completedDownloads.Contains(file.Remote.UniqueId))
+                lock (_downloadsLock)
                 {
-                    return;
-                }
+                    if (_completedDownloads.Contains(file.Remote.UniqueId))
+                    {
+                        return;
+                    }
 
-                _completedDownloads.Add(file.Remote.UniqueId);
+                    _completedDownloads.Add(file.Remote.UniqueId);
+                }
 
                 try
                 {
                     StorageFile source = await StorageFile.GetFileFromPathAsync(file.Local.Path);
                     StorageFile destination = await Future.GetFileAsync(file.Remote.UniqueId, true);
 
+                    var sourceName = source.Name;
+
+                    var response = await SendAsync(new GetSuggestedFileName(file.Id, string.Empty));
+                    if (response is Text text)
+                    {
+                        sourceName = text.TextValue;
+                    }
+
                     await source.CopyAndReplaceAsync(destination);
-                    await destination.RenameAsync(source.Name, NameCollisionOption.GenerateUniqueName);
+                    await destination.RenameAsync(sourceName, NameCollisionOption.GenerateUniqueName);
 
                     Future.Remove(file.Remote.UniqueId, true);
                     Future.AddOrReplace(file.Remote.UniqueId, destination);
@@ -232,8 +255,11 @@ namespace Telegram.Services
 
         public async void CancelDownloadFile(File file, bool onlyIfPending = false)
         {
-            _canceledDownloads.Add(file.Id);
-            _completedDownloads.Remove(file.Remote.UniqueId);
+            lock (_downloadsLock)
+            {
+                _canceledDownloads.Add(file.Id);
+                _completedDownloads.Remove(file.Remote.UniqueId);
+            }
 
             Send(new CancelDownloadFile(file.Id, onlyIfPending));
             Send(new RemoveFileFromDownloads(file.Id, false));
@@ -262,7 +288,10 @@ namespace Telegram.Services
 
         public bool IsDownloadFileCanceled(int fileId)
         {
-            return _canceledDownloads.Contains(fileId);
+            lock (_downloadsLock)
+            {
+                return _canceledDownloads.Contains(fileId);
+            }
         }
 
         private File ProcessFile(File file)
@@ -278,7 +307,7 @@ namespace Telegram.Services
 
                 if (file.Local.IsDownloadingCompleted && !NativeUtils.FileExists(file.Local.Path))
                 {
-                    Send(new DeleteFileW(file.Id));
+                    Send(new DeleteFile(file.Id));
                 }
 
                 return file;
@@ -289,6 +318,12 @@ namespace Telegram.Services
         {
             switch (target)
             {
+                case AdvertisementSponsor advertisementSponsor:
+                    if (advertisementSponsor.Photo != null)
+                    {
+                        ProcessFiles(advertisementSponsor.Photo);
+                    }
+                    break;
                 case AlternativeVideo alternativeVideo:
                     if (alternativeVideo.HlsFile != null)
                     {
@@ -647,6 +682,12 @@ namespace Telegram.Services
                         ProcessFiles(diceStickersSlotMachine.RightReel);
                     }
                     break;
+                case DirectMessagesChatTopic directMessagesChatTopic:
+                    if (directMessagesChatTopic.LastMessage != null)
+                    {
+                        ProcessFiles(directMessagesChatTopic.LastMessage);
+                    }
+                    break;
                 case Document document:
                     if (document.DocumentValue != null)
                     {
@@ -719,12 +760,6 @@ namespace Telegram.Services
                     foreach (var item in encryptedPassportElement.Translation)
                     {
                         ProcessFiles(item);
-                    }
-                    break;
-                case FeedbackChatTopic feedbackChatTopic:
-                    if (feedbackChatTopic.LastMessage != null)
-                    {
-                        ProcessFiles(feedbackChatTopic.LastMessage);
                     }
                     break;
                 case FileDownload fileDownload:
@@ -1217,6 +1252,12 @@ namespace Telegram.Services
                         ProcessFiles(messageGiftedStars.Sticker);
                     }
                     break;
+                case MessageGiftedTon messageGiftedTon:
+                    if (messageGiftedTon.Sticker != null)
+                    {
+                        ProcessFiles(messageGiftedTon.Sticker);
+                    }
+                    break;
                 case MessageGiveaway messageGiveaway:
                     if (messageGiveaway.Sticker != null)
                     {
@@ -1287,12 +1328,6 @@ namespace Telegram.Services
                         ProcessFiles(item);
                     }
                     break;
-                case MessageSponsor messageSponsor:
-                    if (messageSponsor.Photo != null)
-                    {
-                        ProcessFiles(messageSponsor.Photo);
-                    }
-                    break;
                 case MessageSticker messageSticker:
                     if (messageSticker.Sticker != null)
                     {
@@ -1337,6 +1372,10 @@ namespace Telegram.Services
                     if (messageVideo.Cover != null)
                     {
                         ProcessFiles(messageVideo.Cover);
+                    }
+                    foreach (var item in messageVideo.Storyboards)
+                    {
+                        ProcessFiles(item);
                     }
                     if (messageVideo.Video != null)
                     {
@@ -2315,6 +2354,24 @@ namespace Telegram.Services
                         ProcessFiles(tMeUrlTypeChatInvite.Info);
                     }
                     break;
+                case TonTransaction tonTransaction:
+                    if (tonTransaction.Type != null)
+                    {
+                        ProcessFiles(tonTransaction.Type);
+                    }
+                    break;
+                case TonTransactions tonTransactions:
+                    foreach (var item in tonTransactions.Transactions)
+                    {
+                        ProcessFiles(item);
+                    }
+                    break;
+                case TonTransactionTypeFragmentDeposit tonTransactionTypeFragmentDeposit:
+                    if (tonTransactionTypeFragmentDeposit.Sticker != null)
+                    {
+                        ProcessFiles(tonTransactionTypeFragmentDeposit.Sticker);
+                    }
+                    break;
                 case TrendingStickerSets trendingStickerSets:
                     foreach (var item in trendingStickerSets.Sets)
                     {
@@ -2387,10 +2444,10 @@ namespace Telegram.Services
                         ProcessFiles(updateDefaultBackground.Background);
                     }
                     break;
-                case UpdateFeedbackChatTopic updateFeedbackChatTopic:
-                    if (updateFeedbackChatTopic.Topic != null)
+                case UpdateDirectMessagesChatTopic updateDirectMessagesChatTopic:
+                    if (updateDirectMessagesChatTopic.Topic != null)
                     {
-                        ProcessFiles(updateFeedbackChatTopic.Topic);
+                        ProcessFiles(updateDirectMessagesChatTopic.Topic);
                     }
                     break;
                 case UpdateFile updateFile:
@@ -2609,6 +2666,18 @@ namespace Telegram.Services
                         video.VideoValue = ProcessFile(video.VideoValue);
                     }
                     break;
+                case VideoMessageAdvertisement videoMessageAdvertisement:
+                    if (videoMessageAdvertisement.Sponsor != null)
+                    {
+                        ProcessFiles(videoMessageAdvertisement.Sponsor);
+                    }
+                    break;
+                case VideoMessageAdvertisements videoMessageAdvertisements:
+                    foreach (var item in videoMessageAdvertisements.Advertisements)
+                    {
+                        ProcessFiles(item);
+                    }
+                    break;
                 case VideoNote videoNote:
                     if (videoNote.Thumbnail != null)
                     {
@@ -2617,6 +2686,16 @@ namespace Telegram.Services
                     if (videoNote.Video != null)
                     {
                         videoNote.Video = ProcessFile(videoNote.Video);
+                    }
+                    break;
+                case VideoStoryboard videoStoryboard:
+                    if (videoStoryboard.MapFile != null)
+                    {
+                        videoStoryboard.MapFile = ProcessFile(videoStoryboard.MapFile);
+                    }
+                    if (videoStoryboard.StoryboardFile != null)
+                    {
+                        videoStoryboard.StoryboardFile = ProcessFile(videoStoryboard.StoryboardFile);
                     }
                     break;
                 case VoiceNote voiceNote:
@@ -2640,6 +2719,9 @@ namespace Telegram.Services
                     {
                         ProcessFiles(item);
                     }
+                    break;
+                case File file:
+                    ProcessFile(file);
                     break;
             }
         }

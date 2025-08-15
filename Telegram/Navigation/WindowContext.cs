@@ -29,8 +29,12 @@ using Windows.Storage;
 using Windows.UI;
 using Windows.UI.Core;
 using Windows.UI.ViewManagement;
+using Windows.UI.WindowManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+#if NET9_0_OR_GREATER
+using WinRT;
+#endif
 
 namespace Telegram.Navigation
 {
@@ -307,6 +311,11 @@ namespace Telegram.Navigation
             Logger.Debug(sender.Bounds);
             Bounds = sender.Bounds;
 
+            if (SettingsService.Current.Diagnostics.WindowResizeDebug)
+            {
+                return;
+            }
+
             if (_window.Content is FrameworkElement element)
             {
                 element.Width = sender.Bounds.Width;
@@ -320,6 +329,11 @@ namespace Telegram.Navigation
         {
             Logger.Debug(sender.Bounds);
             Bounds = sender.Bounds;
+
+            if (SettingsService.Current.Diagnostics.WindowResizeDebug)
+            {
+                return;
+            }
 
             if (_window.Content is FrameworkElement element)
             {
@@ -478,6 +492,26 @@ namespace Telegram.Navigation
             ApplicationView.GetForCurrentView().TryEnterFullScreenMode();
         }
 
+        public void SetTitleBar(UIElement titleBar, bool collapsed = false)
+        {
+            _window.SetTitleBar(titleBar);
+
+            if (collapsed)
+            {
+#if NET9_0_OR_GREATER
+                var coreWindow = _window.CoreWindow.As<IInternalCoreWindowPhone>();
+                var navigationClient = coreWindow.get_NavigationClient().As<IApplicationWindowTitleBarNavigationClient>();
+
+                navigationClient.set_TitleBarPreferredVisibilityMode(AppWindowTitleBarVisibility.AlwaysHidden);
+#else
+                var coreWindow = (IInternalCoreWindowPhone)(object)_window.CoreWindow;
+                var navigationClient = (IApplicationWindowTitleBarNavigationClient)coreWindow.NavigationClient;
+
+                navigationClient.TitleBarPreferredVisibilityMode = AppWindowTitleBarVisibility.AlwaysHidden;
+#endif
+            }
+        }
+
         #endregion
 
         #region Legacy code
@@ -486,9 +520,6 @@ namespace Telegram.Navigation
         {
             try
             {
-                App.ShareOperation?.TryReportCompleted();
-                App.ShareOperation = null;
-
                 switch (state)
                 {
                     case AuthorizationStateReady:
@@ -612,7 +643,7 @@ namespace Telegram.Navigation
                 buttonHover = Color.FromArgb(25, 255, 255, 255);
                 buttonPressed = Color.FromArgb(51, 255, 255, 255);
             }
-            else if (theme == ApplicationTheme.Light)
+            else
             {
                 //background = Color.FromArgb(255, 230, 230, 230);
                 foreground = Colors.Black;
@@ -660,35 +691,35 @@ namespace Telegram.Navigation
 
         #region Static code
 
-        public static bool IsKeyDown(Windows.System.VirtualKey key)
+        public static bool IsKeyDown(VirtualKey key)
         {
             //return (InputKeyboardSource.GetKeyStateForCurrentThread(key) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
             return (Window.Current.CoreWindow.GetKeyState(key) & CoreVirtualKeyStates.Down) != 0;
         }
 
-        public static bool IsKeyDownAsync(Windows.System.VirtualKey key)
+        public static bool IsKeyDownAsync(VirtualKey key)
         {
             //return (InputKeyboardSource.GetKeyStateForCurrentThread(key) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
             return (Window.Current.CoreWindow.GetAsyncKeyState(key) & CoreVirtualKeyStates.Down) != 0;
         }
 
-        public static Windows.System.VirtualKeyModifiers KeyModifiers()
+        public static VirtualKeyModifiers KeyModifiers()
         {
             //return (InputKeyboardSource.GetKeyStateForCurrentThread(key) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
 
-            var modifiers = Windows.System.VirtualKeyModifiers.None;
+            var modifiers = VirtualKeyModifiers.None;
 
-            if ((Window.Current.CoreWindow.GetAsyncKeyState(Windows.System.VirtualKey.Control) & CoreVirtualKeyStates.Down) != 0)
+            if ((Window.Current.CoreWindow.GetAsyncKeyState(VirtualKey.Control) & CoreVirtualKeyStates.Down) != 0)
             {
                 modifiers |= Windows.System.VirtualKeyModifiers.Control;
             }
 
-            if ((Window.Current.CoreWindow.GetAsyncKeyState(Windows.System.VirtualKey.Menu) & CoreVirtualKeyStates.Down) != 0)
+            if ((Window.Current.CoreWindow.GetAsyncKeyState(VirtualKey.Menu) & CoreVirtualKeyStates.Down) != 0)
             {
                 modifiers |= Windows.System.VirtualKeyModifiers.Menu;
             }
 
-            if ((Window.Current.CoreWindow.GetAsyncKeyState(Windows.System.VirtualKey.Shift) & CoreVirtualKeyStates.Down) != 0)
+            if ((Window.Current.CoreWindow.GetAsyncKeyState(VirtualKey.Shift) & CoreVirtualKeyStates.Down) != 0)
             {
                 modifiers |= Windows.System.VirtualKeyModifiers.Shift;
             }

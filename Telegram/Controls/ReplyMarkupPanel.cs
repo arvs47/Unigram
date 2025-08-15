@@ -7,11 +7,12 @@
 using System;
 using Telegram.Common;
 using Telegram.Controls.Media;
-using Telegram.Navigation;
+using Telegram.Controls.Messages;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Windows.Foundation;
 using Windows.UI.Xaml;
+using Windows.UI.Xaml.Automation.Peers;
 using Windows.UI.Xaml.Controls;
 
 namespace Telegram.Controls
@@ -85,130 +86,6 @@ namespace Telegram.Controls
             {
                 return Update(message, keyboardMarkup);
             }
-            else if (markup is ReplyMarkupInlineKeyboard inlineMarkup && inline)
-            {
-                return Update(message, inlineMarkup);
-            }
-
-            return false;
-        }
-
-        public bool Update(MessageViewModel message, ReplyMarkupInlineKeyboard inlineMarkup)
-        {
-            var rows = inlineMarkup.Rows;
-
-            _oneTime = false;
-            Tag = message;
-
-            var receipt = false;
-            if (message != null && message.Content is MessageInvoice invoice)
-            {
-                receipt = invoice.ReceiptMessageId != 0;
-
-                if (invoice.PaidMedia is not PaidMediaUnsupported and not null)
-                {
-                    rows = null;
-                }
-            }
-
-            if (rows == null)
-            {
-                return false;
-            }
-
-            for (int j = 0; j < rows.Count; j++)
-            {
-                var row = rows[j];
-
-                var panel = new ReplyMarkupRow();
-                panel.HorizontalAlignment = HorizontalAlignment.Stretch;
-                panel.VerticalAlignment = VerticalAlignment.Stretch;
-                panel.Margin = new Thickness(-1, 0, -1, 0);
-
-                for (int i = 0; i < row.Count; i++)
-                {
-                    var item = row[i];
-                    //var builder = new StringBuilder();
-
-                    //foreach (var line in item.Text.Split('\n'))
-                    //{
-                    //    if (builder.Length > 0)
-                    //    {
-                    //        builder.Append(" ");
-                    //    }
-
-                    //    builder.Append(line.Trim());
-                    //}
-
-                    var button = new GlyphButton();
-                    button.Tag = item;
-                    button.HorizontalAlignment = HorizontalAlignment.Stretch;
-                    button.VerticalAlignment = VerticalAlignment.Stretch;
-                    button.Click += Button_Click;
-
-                    button.Style = BootStrapper.Current.Resources["ReplyInlineMarkupButtonStyle"] as Style;
-                    button.Margin = new Thickness(1, 2, 1, 0);
-
-                    button.Content = item.Text.Replace('\n', ' ');
-
-                    switch (item.Type)
-                    {
-                        case InlineKeyboardButtonTypeUrl typeUrl:
-                            button.Glyph = "\uE9B7";
-                            Extensions.SetToolTip(button, typeUrl.Url);
-                            break;
-                        case InlineKeyboardButtonTypeLoginUrl:
-                            button.Glyph = "\uE9B7";
-                            break;
-                        case InlineKeyboardButtonTypeSwitchInline:
-                            button.Glyph = "\uEE35";
-                            break;
-                        case InlineKeyboardButtonTypeBuy:
-                            if (receipt)
-                            {
-                                button.Content = Strings.PaymentReceipt;
-                            }
-                            else
-                            {
-                                button.Content = item.Text.Replace("\u2B50", Icons.Premium + "\u200A");
-                            }
-                            break;
-                        case InlineKeyboardButtonTypeWebApp:
-                            button.Glyph = Icons.Window16;
-                            break;
-                        case InlineKeyboardButtonTypeCopyText:
-                            button.Glyph = Icons.CopyFilled16;
-                            break;
-                    }
-
-                    var topLeft = 4d;
-                    var topRight = 4d;
-                    var bottomRight = 4d;
-                    var bottomLeft = 4d;
-
-                    if (j == rows.Count - 1)
-                    {
-                        if (i == 0)
-                        {
-                            bottomLeft = CornerRadius.BottomLeft;
-                        }
-
-                        if (i == row.Count - 1)
-                        {
-                            bottomRight = CornerRadius.BottomRight;
-                        }
-                    }
-
-                    button.CornerRadius = new CornerRadius(topLeft, topRight, bottomRight, bottomLeft);
-
-                    panel.Children.Add(button);
-                }
-
-                SetRow(panel, j);
-
-                RowDefinitions.Add(1, GridUnitType.Star);
-                Children.Add(panel);
-            }
 
             return false;
         }
@@ -245,17 +122,13 @@ namespace Telegram.Controls
                 for (int i = 0; i < row.Count; i++)
                 {
                     var item = row[i];
-                    var button = new GlyphButton();
-                    button.Tag = item;
+                    var button = new ReplyMarkupButton(item);
                     button.HorizontalAlignment = HorizontalAlignment.Stretch;
                     button.VerticalAlignment = VerticalAlignment.Stretch;
-                    button.Click += Button_Click;
-
-                    button.Style = BootStrapper.Current.Resources["ReplyKeyboardMarkupButtonStyle"] as Style;
                     button.Margin = new Thickness(4, 8, 4, 0);
                     button.Height = resize ? 36 : double.NaN;
-
-                    button.Content = item.Text;
+                    button.Text = item.Text;
+                    button.Click += Button_Click;
 
                     if (item.Type is KeyboardButtonTypeWebApp)
                     {
@@ -283,19 +156,13 @@ namespace Telegram.Controls
 
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            var button = sender as Button;
-            if (button.Tag is KeyboardButton btn)
+            if (sender is ReplyMarkupButton button)
             {
-                ButtonClick?.Invoke(this, new ReplyMarkupButtonClickEventArgs(btn, _oneTime));
-            }
-            else if (button.Tag is InlineKeyboardButton inlineBtn)
-            {
-                InlineButtonClick?.Invoke(this, new ReplyMarkupInlineButtonClickEventArgs(inlineBtn));
+                ButtonClick?.Invoke(this, new ReplyMarkupButtonClickEventArgs(button.Button, _oneTime));
             }
         }
 
         public event EventHandler<ReplyMarkupButtonClickEventArgs> ButtonClick;
-        public event EventHandler<ReplyMarkupInlineButtonClickEventArgs> InlineButtonClick;
     }
 
     public partial class ReplyMarkupRow : Panel
@@ -335,6 +202,162 @@ namespace Telegram.Controls
             }
 
             return finalSize;
+        }
+    }
+
+    public class ReplyMarkupButton : GlyphButton
+    {
+        public ReplyMarkupButton(KeyboardButton button)
+        {
+            DefaultStyleKey = typeof(ReplyMarkupButton);
+            Button = button;
+        }
+
+        protected override AutomationPeer OnCreateAutomationPeer()
+        {
+            return new ReplyMarkupButtonAutomationPeer(this);
+        }
+
+        public KeyboardButton Button { get; }
+
+        #region Text
+
+        public string Text
+        {
+            get { return (string)GetValue(TextProperty); }
+            set { SetValue(TextProperty, value); }
+        }
+
+        public static readonly DependencyProperty TextProperty =
+            DependencyProperty.Register("Text", typeof(string), typeof(ReplyMarkupButton), new PropertyMetadata(string.Empty));
+
+        #endregion
+    }
+
+    public class ReplyMarkupButtonAutomationPeer : ButtonAutomationPeer
+    {
+        private readonly ReplyMarkupButton _owner;
+
+        public ReplyMarkupButtonAutomationPeer(ReplyMarkupButton owner)
+            : base(owner)
+        {
+            _owner = owner;
+        }
+
+        protected override string GetNameCore()
+        {
+            return _owner.Text;
+        }
+    }
+
+    public class ReplyMarkupInlineButton : GlyphButton
+    {
+        public readonly ReplyMarkupInlinePanel _owner;
+
+        public ReplyMarkupInlineButton(ReplyMarkupInlinePanel owner, InlineKeyboardButton button)
+        {
+            _owner = owner;
+
+            DefaultStyleKey = typeof(ReplyMarkupInlineButton);
+            Button = button;
+        }
+
+        protected override AutomationPeer OnCreateAutomationPeer()
+        {
+            return new ReplyMarkupInlineButtonAutomationPeer(this);
+        }
+
+        public InlineKeyboardButton Button { get; }
+
+        private UIElement IconPresenter;
+
+        protected override void OnApplyTemplate()
+        {
+            if (!string.IsNullOrEmpty(Icon))
+            {
+                IconPresenter = GetTemplateChild(nameof(IconPresenter)) as UIElement;
+                IconPresenter.Visibility = Visibility.Visible;
+            }
+
+            base.OnApplyTemplate();
+        }
+
+        #region Text
+
+        public string Text
+        {
+            get { return (string)GetValue(TextProperty); }
+            set { SetValue(TextProperty, value); }
+        }
+
+        public static readonly DependencyProperty TextProperty =
+            DependencyProperty.Register("Text", typeof(string), typeof(ReplyMarkupInlineButton), new PropertyMetadata(string.Empty));
+
+        #endregion
+
+        #region Icon
+
+        public string Icon
+        {
+            get { return (string)GetValue(IconProperty); }
+            set { SetValue(IconProperty, value); }
+        }
+
+        public static readonly DependencyProperty IconProperty =
+            DependencyProperty.Register("Icon", typeof(string), typeof(ReplyMarkupInlineButton), new PropertyMetadata(string.Empty, OnIconChanged));
+
+        private static void OnIconChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var sender = d as ReplyMarkupInlineButton;
+            if (sender?.IconPresenter != null || !string.IsNullOrEmpty((string)e.NewValue))
+            {
+                sender.IconPresenter ??= sender.GetTemplateChild(nameof(sender.IconPresenter)) as UIElement;
+
+                if (sender.IconPresenter != null)
+                {
+                    sender.IconPresenter.Visibility = string.IsNullOrEmpty((string)e.NewValue)
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
+                }
+            }
+        }
+
+        #endregion
+    }
+
+    public class ReplyMarkupInlineButtonAutomationPeer : ButtonAutomationPeer
+    {
+        private readonly ReplyMarkupInlineButton _owner;
+
+        public ReplyMarkupInlineButtonAutomationPeer(ReplyMarkupInlineButton owner)
+            : base(owner)
+        {
+            _owner = owner;
+        }
+
+        protected override string GetNameCore()
+        {
+            return _owner.Text;
+        }
+
+        protected override int GetPositionInSetCore()
+        {
+            if (_owner._owner != null)
+            {
+                return 1 + _owner._owner.Children.IndexOf(_owner);
+            }
+
+            return base.GetPositionInSetCore();
+        }
+
+        protected override int GetSizeOfSetCore()
+        {
+            if (_owner._owner != null)
+            {
+                return _owner._owner.Children.Count;
+            }
+
+            return base.GetSizeOfSetCore();
         }
     }
 }

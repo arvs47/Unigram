@@ -55,7 +55,7 @@ namespace Telegram.Common
 
         public IClientService ClientService => _clientService;
 
-        public async void NavigateToWebApp(User botUser, string url, long launchId = 0, AttachmentMenuBot menuBot = null, WebAppOpenMode openMode = null, Chat sourceChat = null, InternalLinkType sourceLink = null)
+        public async void NavigateToWebApp(User botUser, string url, long launchId = 0, AttachmentMenuBot menuBot = null, WebAppOpenMode openMode = null, Chat sourceChat = null, InternalLinkType sourceLink = null, string buttonText = null)
         {
             if (sourceLink != null)
             {
@@ -83,7 +83,7 @@ namespace Telegram.Common
                 Height = 640,
                 PersistedId = "WebApp",
                 ViewMode = openMode is WebAppOpenModeFullScreen ? ViewServiceMode.FullScreen : ViewServiceMode.Default,
-                Content = control => new WebAppPage(ClientService, botUser, url, launchId, menuBot, sourceChat, sourceLink)
+                Content = control => new WebAppPage(ClientService, botUser, url, launchId, menuBot, sourceChat, sourceLink, buttonText)
             });
         }
 
@@ -188,19 +188,74 @@ namespace Telegram.Common
             }
         }
 
-        public async void ShowLimitReached(PremiumLimitType type)
+        public void ShowLimitReached(PremiumLimitType type)
         {
-            await new LimitReachedPopup(this, _clientService, type).ShowQueuedAsync(XamlRoot);
+            ShowPopup(new LimitReachedPopup(this, _clientService, type));
         }
 
-        public async void ShowPromo(PremiumSource source = null)
+        public void ShowPromo(PremiumSource source = null)
         {
-            await ShowPopupAsync(new PromoPopup(), source);
+            ShowPopup(new PromoPopup(), source);
         }
 
         public Task ShowPromoAsync(PremiumSource source = null, ElementTheme requestedTheme = ElementTheme.Default)
         {
             return ShowPopupAsync(new PromoPopup(), source, requestedTheme: requestedTheme);
+        }
+
+        public async void ShowPromo(PremiumFeature feature, PremiumSource source = null)
+        {
+            PremiumSource premiumSource = new PremiumSourceFeature(feature);
+
+            var features = await ClientService.SendAsync(new GetPremiumFeatures(premiumSource)) as PremiumFeatures;
+            if (features == null)
+            {
+                return;
+            }
+
+            var appIcons = features.Features.FirstOrDefault(x => x is PremiumFeatureAppIcons);
+            if (appIcons != null)
+            {
+                features.Features.Remove(appIcons);
+            }
+
+            var archivedChats = features.Limits.FirstOrDefault(x => x.Type is PremiumLimitTypePinnedArchivedChatCount);
+            if (archivedChats != null)
+            {
+                features.Limits.Remove(archivedChats);
+            }
+
+            features.Limits.Add(new PremiumLimit(new PremiumLimitTypeConnectedAccounts(), 3, 4));
+
+            var state = await ClientService.SendAsync(new GetPremiumState()) as PremiumState;
+            if (state == null)
+            {
+                return;
+            }
+
+            var option = state.PaymentOptions.LastOrDefault();
+
+            var animations = state.Animations
+                .DistinctBy(x => x.Feature.GetType())
+                .ToDictionary(x => x.Feature.GetType(), y => y.Animation);
+
+            var stickers = await ClientService.SendAsync(new GetPremiumStickerExamples()) as Stickers;
+
+            var businessFeatures = await ClientService.SendAsync(new GetBusinessFeatures()) as BusinessFeatures;
+            if (businessFeatures == null)
+            {
+                return;
+            }
+
+            feature = features.Features.FirstOrDefault(x => x.GetType() == feature.GetType());
+
+            var popup = new FeaturesPopup(ClientService, option?.PaymentOption, features.Features, businessFeatures.Features, features.Limits, animations, stickers, feature);
+            await ShowPopupAsync(popup);
+
+            if (popup.ShouldPurchase)
+            {
+                ShowPromo(source ?? premiumSource);
+            }
         }
 
         public void NavigateToInvoice(MessageViewModel message)
@@ -349,7 +404,7 @@ namespace Telegram.Common
                     return;
                 }
 
-                if (supergroup.Status is ChatMemberStatusLeft && !supergroup.IsPublic() && !_clientService.IsChatAccessible(chat))
+                if (supergroup.Status is ChatMemberStatusLeft && !supergroup.IsDirectMessagesGroup && !supergroup.IsPublic() && !_clientService.IsChatAccessible(chat))
                 {
                     await ShowPopupAsync(Strings.ChannelCantOpenPrivate, Strings.AppName, Strings.OK);
                     return;
@@ -483,10 +538,10 @@ namespace Telegram.Common
                             target = typeof(ChatPage);
                             parameter = topic == null ? chat.Id : new ChatMessageTopic(chat.Id, topic);
 
-                            var currentChat = this.GetChatFromBackStack(true, typeof(ProfilePage));
+                            var currentChat = this.GetChatFromBackStack(true, typeof(ProfilePage), typeof(ChatPinnedPage));
                             if (currentChat.ChatId == chat.Id && currentChat.MessageTopic.AreTheSame(topic))
                             {
-                                if (CurrentPageType == typeof(ProfilePage))
+                                if (CurrentPageType == typeof(ProfilePage) || CurrentPageType == typeof(ChatPinnedPage))
                                 {
                                     var cacheKey = Guid.NewGuid().ToString();
                                     var cacheParameter = parameter;
@@ -505,6 +560,10 @@ namespace Telegram.Common
                                 {
                                     info = new SlideNavigationTransitionInfo { Effect = SlideNavigationTransitionEffect.FromRight };
                                 }
+                            }
+                            else if (currentChat.ChatId == chat.Id && currentChat.MessageTopic == null && topic != null)
+                            {
+                                info = new SlideNavigationTransitionInfo { Effect = SlideNavigationTransitionEffect.FromRight };
                             }
                             else
                             {

@@ -47,7 +47,9 @@ namespace Telegram.ViewModels
 
         public bool IsForum => _viewModel is DialogViewModel { IsForum: true };
 
-        public bool IsFeedbackGroup => _viewModel is DialogViewModel { IsFeedbackGroup: true };
+        public bool IsDirectMessagesGroup => _viewModel is DialogViewModel { IsDirectMessagesGroup: true };
+
+        public bool IsSavedMessagesTab => _viewModel is DialogViewModel { IsSavedMessagesTab: true };
 
         public override INavigationService NavigationService
         {
@@ -64,6 +66,8 @@ namespace Telegram.ViewModels
         public virtual ReactionType SavedMessagesTag { get; set; }
 
 
+
+        private static readonly string _executableExtensions = "ad ade adp ahk app application appref-ms asp aspx asx bas bat bin cab cdxml cer cfg cgi chi chm cmd cnt com conf cpl crt csh der diagcab dll drv eml exe fon fxp gadget grp hlp hpj hta htt inf ini ins inx isp isu its jar jnlp job js jse jsp key ksh lexe library-ms lnk local lua mad maf mag mam manifest maq mar mas mat mau mav maw mcf mda mdb mde mdt mdw mdz mht mhtml mjs mmc mof msc msg msh msh1 msh2 msh1xml msh2xml mshxml msi msp mst ops osd paf pcd phar php php3 php4 php5 php7 phps php-s pht phtml pif pl plg pm pod prf prg ps1 ps2 ps1xml ps2xml psc1 psc2 psd1 psm1 pssc pst py py3 pyc pyd pyi pyo pyw pyzw pyz rb reg rgs scf scr sct search-ms settingcontent-ms sh shb shs slk sys swf t tmp u3p url vb vbe vbp vbs vbscript vdx vsmacros vsd vsdm vsdx vss vssm vssx vst vstm vstx vsw vsx vtx website wlua ws wsc wsf wsh xbap xll xlsb xlsm xnk xs";
 
         public virtual bool CanBeDownloaded(object content, File file)
         {
@@ -83,6 +87,12 @@ namespace Telegram.ViewModels
             }
             else if (content is Document document)
             {
+                var extension = System.IO.Path.GetExtension(document.FileName);
+                if (_executableExtensions.Contains(extension.TrimStart('.')))
+                {
+                    return false;
+                }
+
                 return Settings.AutoDownload.ShouldDownloadDocument(GetChatType(chat), document.DocumentValue.Size);
             }
             else if (content is Photo photo)
@@ -351,12 +361,12 @@ namespace Telegram.ViewModels
         /// <summary>
         /// Only available when created through DialogViewModel
         /// </summary>
-        public virtual void OpenMedia(MessageViewModel message, FrameworkElement target, int timestamp = 0) { }
+        public virtual void OpenMedia(MessageViewModel message, FrameworkElement target, double timestamp = 0) { }
 
         /// <summary>
         /// Only available when created through DialogViewModel
         /// </summary>
-        public virtual void OpenPaidMedia(MessageViewModel message, PaidMedia media, FrameworkElement target, int timestamp = 0) { }
+        public virtual void OpenPaidMedia(MessageViewModel message, PaidMedia media, FrameworkElement target, double timestamp = 0) { }
 
         /// <summary>
         /// Only available when created through DialogViewModel
@@ -487,9 +497,9 @@ namespace Telegram.ViewModels
             //}
         }
 
-        public override void OpenMedia(MessageViewModel message, FrameworkElement target, int timestamp = 0) => _viewModel.OpenMedia(message, target, timestamp);
+        public override void OpenMedia(MessageViewModel message, FrameworkElement target, double timestamp = 0) => _viewModel.OpenMedia(message, target, timestamp);
 
-        public override void OpenPaidMedia(MessageViewModel message, PaidMedia media, FrameworkElement target, int timestamp = 0)
+        public override void OpenPaidMedia(MessageViewModel message, PaidMedia media, FrameworkElement target, double timestamp = 0)
         {
             _viewModel.OpenPaidMedia(message, media, target, timestamp);
         }
@@ -533,7 +543,7 @@ namespace Telegram.ViewModels
             return !Settings.AutoDownload.Disabled;
         }
 
-        public override void OpenMedia(MessageViewModel message, FrameworkElement target, int timestamp = 0)
+        public override void OpenMedia(MessageViewModel message, FrameworkElement target, double timestamp = 0)
         {
             var content = target.Tag as GalleryMedia;
             content ??= _viewModel.Gallery.Items.FirstOrDefault();

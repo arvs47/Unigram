@@ -27,14 +27,14 @@ using Windows.UI.Xaml.Shapes;
 
 namespace Telegram.Controls.Cells
 {
-    public sealed partial class ForumTopicVerticalCell : ControlEx, IForumTopicDelegate, IFeedbackTopicDelegate
+    public sealed partial class ForumTopicVerticalCell : ControlEx, IForumTopicDelegate, IDirectMessagesTopicDelegate
     {
         private bool _selected;
 
         private bool _vertical;
 
         private ForumTopic _forumTopic;
-        private FeedbackChatTopic _feedbackChatTopic;
+        private DirectMessagesChatTopic _directMessagesChatTopic;
         private Chat _chat;
 
         private int _thumbnailId;
@@ -95,9 +95,9 @@ namespace Telegram.Controls.Cells
             {
                 UpdateForumTopic(_viewModel, _forumTopic);
             }
-            else if (_feedbackChatTopic != null)
+            else if (_directMessagesChatTopic != null)
             {
-                UpdateFeedbackChatTopic(_viewModel, _feedbackChatTopic);
+                UpdateDirectMessagesChatTopic(_viewModel, _directMessagesChatTopic);
             }
         }
 
@@ -282,7 +282,7 @@ namespace Telegram.Controls.Cells
             }
         }
 
-        public void UpdateNotificationSettings(ForumTopic topic)
+        public void UpdateForumTopicNotificationSettings(ForumTopic topic)
         {
             if (_viewModel == null || !_templateApplied)
             {
@@ -380,30 +380,30 @@ namespace Telegram.Controls.Cells
 
             //UpdateChatReadInbox(chat);
             UpdateForumTopicUnreadMentionCount(topic);
-            UpdateNotificationSettings(topic);
+            UpdateForumTopicNotificationSettings(topic);
         }
 
         #endregion
 
-        #region FeedbackChatTopic
+        #region DirectMessagesChatTopic
 
-        public void UpdateFeedbackChatTopicLastMessage(FeedbackChatTopic topic)
+        public void UpdateDirectMessagesChatTopicLastMessage(DirectMessagesChatTopic topic)
         {
             // Not implemented for now
         }
 
-        public void UpdateFeedbackChatTopicReadInbox(FeedbackChatTopic topic)
+        public void UpdateDirectMessagesChatTopicReadInbox(DirectMessagesChatTopic topic)
         {
             if (_viewModel == null || !_templateApplied)
             {
                 return;
             }
 
-            var unread = (topic.UnreadCount > 0 || topic.IsMarkedAsUnread) ? topic.UnreadCount == 1 ? Visibility.Collapsed : Visibility.Visible : Visibility.Collapsed;
+            var unread = (topic.UnreadCount > 0 || topic.IsMarkedAsUnread) ? topic.UnreadReactionCount > 0 ? Visibility.Collapsed : Visibility.Visible : Visibility.Collapsed;
             if (unread == Visibility.Visible)
             {
                 UnreadBadge.Visibility = Visibility.Visible;
-                //UnreadBadge.Text = topic.UnreadCount > 0 ? topic.UnreadCount.ToString() : string.Empty;
+                UnreadBadge.Text = topic.UnreadCount > 0 ? topic.UnreadCount.ToString() : string.Empty;
             }
             else
             {
@@ -413,24 +413,24 @@ namespace Telegram.Controls.Cells
             //UpdateAutomation(_clientService, chat, chat.LastMessage);
         }
 
-        public void UpdateFeedbackChatTopicReadOutbox(FeedbackChatTopic topic)
+        public void UpdateDirectMessagesChatTopicReadOutbox(DirectMessagesChatTopic topic)
         {
             // Not implemented for now
         }
 
-        public void UpdateFeedbackChatIsMarkedAsUnread(Chat chat)
+        public void UpdateDirectMessagesChatIsMarkedAsUnread(Chat chat)
         {
 
         }
 
-        public void UpdateFeedbackChatTopicUnreadMentionCount(FeedbackChatTopic topic)
+        public void UpdateDirectMessagesChatTopicUnreadMentionCount(DirectMessagesChatTopic topic)
         {
             if (_viewModel == null || !_templateApplied)
             {
                 return;
             }
 
-            UpdateFeedbackChatTopicReadInbox(topic);
+            UpdateDirectMessagesChatTopicReadInbox(topic);
 
             var unread = topic.UnreadReactionCount > 0 ? Visibility.Visible : Visibility.Collapsed;
             if (unread == Visibility.Visible)
@@ -444,7 +444,7 @@ namespace Telegram.Controls.Cells
             }
         }
 
-        public void UpdateNotificationSettings(FeedbackChatTopic topic)
+        public void UpdateNotificationSettings(DirectMessagesChatTopic topic)
         {
             if (_viewModel == null || !_templateApplied)
             {
@@ -454,15 +454,15 @@ namespace Telegram.Controls.Cells
             UnreadBadge.IsUnmuted = true;
         }
 
-        public void UpdateFeedbackChatTopicActions(FeedbackChatTopic topic, IDictionary<MessageSender, ChatAction> actions)
+        public void UpdateDirectMessagesChatTopicActions(DirectMessagesChatTopic topic, IDictionary<MessageSender, ChatAction> actions)
         {
             // Not implemented for now
         }
 
-        public void UpdateFeedbackChatTopic(TopicListViewModel viewModel, FeedbackChatTopic topic)
+        public void UpdateDirectMessagesChatTopic(TopicListViewModel viewModel, DirectMessagesChatTopic topic)
         {
             _viewModel = viewModel;
-            _feedbackChatTopic = topic;
+            _directMessagesChatTopic = topic;
             _chat = _viewModel.ClientService.GetChat(topic.ChatId);
 
             if (!_templateApplied)
@@ -479,16 +479,16 @@ namespace Telegram.Controls.Cells
             else
             {
                 TitleLabel.Text = _viewModel.ClientService.GetTitle(topic.SenderId);
-                Photo.SetMessageSender(_viewModel.ClientService, topic.SenderId, _vertical ? 36 : 20);
+                Photo.SetMessageSender(_viewModel.ClientService, topic.SenderId, _vertical ? 28 : 20);
                 AllTopics.Visibility = Visibility.Collapsed;
             }
 
-            //UpdateFeedbackChatTopicName(topic);
-            //UpdateFeedbackChatTopicIcon(topic);
+            //UpdateDirectMessagesChatTopicName(topic);
+            //UpdateDirectMessagesChatTopicIcon(topic);
             //UpdateChatEmojiStatus(topic);
 
             //UpdateChatReadInbox(chat);
-            UpdateFeedbackChatTopicUnreadMentionCount(topic);
+            UpdateDirectMessagesChatTopicUnreadMentionCount(topic);
             UpdateNotificationSettings(topic);
         }
 

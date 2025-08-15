@@ -1,4 +1,10 @@
-﻿using Microsoft.Graphics.Canvas;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Geometry;
 using System;
 using System.Collections.Generic;
@@ -7,6 +13,9 @@ using Telegram.Common;
 using Windows.UI.Composition;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Hosting;
+#if NET9_0_OR_GREATER
+using WinRT;
+#endif
 
 namespace Windows.UI.Xaml.Hosting
 {
@@ -69,12 +78,25 @@ namespace Telegram.Composition
             surfaceBrush.Surface = surface;
             surfaceBrush.Stretch = CompositionStretch.Fill;
 
+#if NET9_0_OR_GREATER
+            if (freeze)
+            {
+                var partner = surface.As<ICompositionVisualSurfacePartner>();
+                if (partner != null)
+                {
+                    partner.set_Stretch(CompositionStretch.Fill);
+                    partner.set_RealizationSize(sourceSize * (float)source.XamlRoot.RasterizationScale);
+                    partner.Freeze();
+                }
+            }
+#else
             if (freeze && surface is object obj && obj is ICompositionVisualSurfacePartner partner)
             {
                 partner.Stretch = CompositionStretch.Fill;
                 partner.RealizationSize = sourceSize * (float)source.XamlRoot.RasterizationScale;
                 partner.Freeze();
             }
+#endif
 
             return surfaceBrush;
         }

@@ -12,6 +12,7 @@ using Telegram.Controls;
 using Telegram.Converters;
 using Telegram.Services;
 using Telegram.Td.Api;
+using Telegram.ViewModels;
 using Telegram.ViewModels.Supergroups;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -32,7 +33,7 @@ namespace Telegram.Views.Popups
         private IList<MessageSender> _deleteAll;
         private IList<MessageSender> _banUser;
 
-        public DeleteMessagesPopup(IClientService clientService, Chat chat, MessageTopic topic, IList<Message> messages, IDictionary<MessageId, MessageProperties> properties)
+        public DeleteMessagesPopup(IClientService clientService, Chat chat, MessageTopic topic, IList<MessageWithOwner> messages, IDictionary<MessageId, MessageProperties> properties)
         {
             InitializeComponent();
 
@@ -48,10 +49,10 @@ namespace Telegram.Views.Popups
             var senders = messages
                 .Select(x => x.SenderId)
                 .Distinct(new MessageSenderEqualityComparer())
-                .Where(x => !x.IsUser(clientService.Options.MyId))
+                .Where(x => !x.IsUser(clientService.Options.MyId) && !x.IsChat(chat.Id))
                 .ToList();
 
-            if (senders.Count > 1 && supergroup?.IsChannel is false)
+            if (senders.Count > 1 && supergroup?.IsChannel is false && supergroup?.IsDirectMessagesGroup is false)
             {
                 ReportSpamCheck.Content = Strings.DeleteReportSpam;
                 DeleteAllCheck.Content = Strings.DeleteAllFromUsers;
@@ -67,7 +68,7 @@ namespace Telegram.Views.Popups
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
-            else if (senders.Count > 0 && supergroup?.IsChannel is false)
+            else if (senders.Count > 0 && supergroup?.IsChannel is false && supergroup?.IsDirectMessagesGroup is false)
             {
                 ReportSpamCheck.Content = Strings.DeleteReportSpam;
                 DeleteAllCheck.Content = string.Format(Strings.DeleteAllFrom, clientService.GetTitle(senders[0]));

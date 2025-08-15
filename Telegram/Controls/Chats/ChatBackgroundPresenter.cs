@@ -45,6 +45,7 @@ namespace Telegram.Controls.Chats
         private double _rasterizationScale;
 
         private Border Canvas;
+        private Border Negative;
 
         public ChatBackgroundPresenter()
         {
@@ -60,6 +61,18 @@ namespace Telegram.Controls.Chats
         protected override void OnApplyTemplate()
         {
             Canvas = GetTemplateChild(nameof(Canvas)) as Border;
+            Negative = GetTemplateChild(nameof(Negative)) as Border;
+
+            Canvas.Margin = new Thickness(-BorderThickness.Left, -BorderThickness.Top, 0, 0);
+            Negative.Margin = new Thickness(-BorderThickness.Left, -BorderThickness.Top, 0, 0);
+
+            RegisterPropertyChangedCallback(BorderThicknessProperty, OnBorderThicknessChanged);
+        }
+
+        private void OnBorderThicknessChanged(DependencyObject sender, DependencyProperty dp)
+        {
+            Canvas.Margin = new Thickness(-BorderThickness.Left, -BorderThickness.Top, 0, 0);
+            Negative.Margin = new Thickness(-BorderThickness.Left, -BorderThickness.Top, 0, 0);
         }
 
         private void OnLoaded(object sender, RoutedEventArgs e)
@@ -143,7 +156,7 @@ namespace Telegram.Controls.Chats
 
                 Background = typeFill.ToBrush(_freeform.Phase);
                 Foreground = null;
-                BorderBrush = null;
+                NegativeBrush = null;
 
                 UpdateBlurred(false);
             }
@@ -159,7 +172,7 @@ namespace Telegram.Controls.Chats
                 {
                     Background = typePattern.ToBrush(_freeform.Phase);
                     Foreground = null;
-                    BorderBrush = _negative
+                    NegativeBrush = _negative
                         ? new SolidColorBrush(Colors.Black)
                         : null;
                 }
@@ -242,6 +255,7 @@ namespace Telegram.Controls.Chats
                         : chatTheme.DarkSettings?.Background;
 
                     UpdateSource(clientService, background, thumbnail);
+                    return;
                 }
             }
         }
@@ -249,7 +263,7 @@ namespace Telegram.Controls.Chats
         private void UpdateWallpaper(File file)
         {
             Foreground = null;
-            BorderBrush = null;
+            NegativeBrush = null;
 
             if (_wallpaperPath != file.Local.Path)
             {
@@ -276,18 +290,17 @@ namespace Telegram.Controls.Chats
         {
             if (_pattern != null && _patternPath == file.Local.Path && _rasterizationScale == scale)
             {
-                UpdatePattern(pattern, 1);
+                UpdatePattern(pattern, true);
                 return;
             }
 
-            //UpdatePattern(pattern, 0);
+            UpdatePattern(pattern, false);
 
             if (file.Local.IsDownloadingCompleted)
             {
-                if (_negative)
-                {
-                    BorderBrush = new SolidColorBrush(Colors.Black);
-                }
+                NegativeBrush = _negative
+                    ? new SolidColorBrush(Colors.Black)
+                    : null;
 
                 _patternPath = file.Local.Path;
                 _rasterizationScale = scale;
@@ -307,8 +320,7 @@ namespace Telegram.Controls.Chats
 
                     if (_backgroundId == file.Id && !IsDisconnected)
                     {
-                        BorderBrush = null;
-                        UpdatePattern(pattern, 1);
+                        UpdateTiledBrush(true);
                     }
                     // TODO: Dispose here shouldn't be needed
                     //else
@@ -317,22 +329,19 @@ namespace Telegram.Controls.Chats
                     //}
                 }
 
+                if (_backgroundId != file.Id)
+                {
+                    return;
+                }
+
                 if (_pattern != null)
                 {
                     _pattern.LoadCompleted += handler;
                 }
-                else if (_backgroundId == file.Id)
-                {
-                    BorderBrush = null;
-                }
-            }
-            else
-            {
-                UpdatePattern(pattern, 0);
             }
         }
 
-        private void UpdatePattern(BackgroundTypePattern pattern, double opacity)
+        private void UpdatePattern(BackgroundTypePattern pattern, bool show)
         {
             var fill = pattern.Fill;
             if (fill is BackgroundFillSolid solid)
@@ -360,17 +369,18 @@ namespace Telegram.Controls.Chats
                 }
             }
 
-            UpdateTiledBrush(opacity);
+            UpdateTiledBrush(show);
         }
 
-        private void UpdateTiledBrush(double opacity)
+        private bool _collapsed = true;
+
+        private void UpdateTiledBrush(bool show)
         {
             if (Foreground is TiledBrush tiledBrush)
             {
                 tiledBrush.ImageSource = _pattern;
                 tiledBrush.Intensity = _intensity;
                 tiledBrush.IsNegative = _negative;
-                tiledBrush.Opacity = opacity;
 
                 tiledBrush.Update();
             }
@@ -383,6 +393,35 @@ namespace Telegram.Controls.Chats
                     IsNegative = _negative,
                 };
             }
+
+            if (_collapsed != show || Canvas == null)
+            {
+                return;
+            }
+
+            _collapsed = !show;
+
+            var canvas = ElementComposition.GetElementVisual(Canvas);
+            var negative = ElementComposition.GetElementVisual(Negative);
+
+            var hide = _negative ? show : !show;
+            var target = _negative ? negative : canvas;
+
+            if (_negative)
+            {
+                canvas.StopAnimation("Opacity");
+                canvas.Opacity = 1;
+            }
+            else
+            {
+                negative.StopAnimation("Opacity");
+                negative.Opacity = 0;
+            }
+
+            var animation = canvas.Compositor.CreateScalarKeyFrameAnimation();
+            animation.InsertKeyFrame(hide ? 0 : 1, 1);
+            animation.InsertKeyFrame(hide ? 1 : 0, 0);
+            target.StartAnimation("Opacity", animation);
         }
 
         private SpriteVisual _blurVisual;
@@ -429,5 +468,18 @@ namespace Telegram.Controls.Chats
                 this.BeginOnUIThread(() => UpdateSource(null, _background, _thumbnail));
             }
         }
+
+        #region NegativeBrush
+
+        public Brush NegativeBrush
+        {
+            get { return (Brush)GetValue(NegativeBrushProperty); }
+            set { SetValue(NegativeBrushProperty, value); }
+        }
+
+        public static readonly DependencyProperty NegativeBrushProperty =
+            DependencyProperty.Register("NegativeBrush", typeof(Brush), typeof(ChatBackgroundPresenter), new PropertyMetadata(null));
+
+        #endregion
     }
 }

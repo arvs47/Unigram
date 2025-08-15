@@ -1,4 +1,10 @@
-﻿using System.Collections.ObjectModel;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Telegram.Common;
@@ -15,14 +21,12 @@ namespace Telegram.Collections
     {
         private readonly IClientService _clientService;
         private readonly string _query;
-        private readonly EmojiSkinTone _skin;
         private readonly EmojiDrawerMode _mode;
 
-        public SearchEmojiCollection(IClientService clientService, string query, EmojiSkinTone skin, EmojiDrawerMode mode)
+        public SearchEmojiCollection(IClientService clientService, string query, EmojiDrawerMode mode)
         {
             _clientService = clientService;
             _query = query;
-            _skin = skin;
             _mode = mode;
         }
 
@@ -54,7 +58,7 @@ namespace Telegram.Collections
                             var emoji = item.Emoji;
                             if (Emoji.EmojiGroupInternal._skinEmojis.Contains(emoji) || Emoji.EmojiGroupInternal._skinEmojis.Contains(emoji.TrimEnd('\uFE0F')))
                             {
-                                Add(new EmojiSkinData(emoji, _skin));
+                                Add(SettingsService.Current.Emoji.GetEmojiSkinTone(emoji));
                             }
                             else
                             {

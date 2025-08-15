@@ -25,7 +25,6 @@ using Telegram.Views.Calls.Popups;
 using Telegram.Views.Host;
 using Telegram.Views.Popups;
 using Windows.Foundation;
-using Windows.System;
 using Windows.System.Display;
 using Windows.UI;
 using Windows.UI.Composition;
@@ -36,7 +35,6 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Media;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Views.Calls
 {
@@ -446,8 +444,8 @@ namespace Telegram.Views.Calls
                 }
 
                 BottomShadow.Visibility = Visibility.Visible;
-                BottomPanel.Padding = new Thickness(0, 0, 0, 0);
-                BottomRoot.Padding = new Thickness(0, 0, 0, 0);
+                BottomPanel.Padding = new Thickness(0);
+                BottomRoot.Padding = new Thickness(0);
                 BottomBackground.Background = null;
                 BottomRoot.RowDefinitions[0].Height = new GridLength(24, GridUnitType.Pixel);
 
@@ -1572,7 +1570,7 @@ namespace Telegram.Views.Calls
 
         private async void ShareInviteLink()
         {
-            await this.ShowPopupAsync(_call.ClientService.SessionId, new ChooseChatsPopup(), new ChooseChatsConfigurationGroupCall(_call.Id));
+            await this.ShowPopupAsync(_call.ClientService.SessionId, new ChooseChatsPopup(), new ChooseChatsConfigurationGroupCall(_call.Id, false));
         }
 
         private void OnChoosingItemContainer(ListViewBase sender, ChoosingItemContainerEventArgs args)

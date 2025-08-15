@@ -15,6 +15,7 @@ using Telegram.Navigation;
 using Telegram.ViewModels;
 using Telegram.ViewModels.Delegates;
 using Windows.Devices.Input;
+using Windows.Foundation;
 using Windows.UI.Input;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation.Peers;
@@ -22,8 +23,6 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
-using Point = Windows.Foundation.Point;
-using VirtualKey = Windows.System.VirtualKey;
 
 namespace Telegram.Controls.Chats
 {
@@ -70,14 +69,18 @@ namespace Telegram.Controls.Chats
 
         public void ScrollToBottom()
         {
+            HasBeenScrolled = true;
             ScrollingHost?.ChangeView(null, ScrollingHost.ScrollableHeight, null);
         }
 
         public bool IsSuspended => !_raiseViewChanged;
 
+        public bool HasBeenScrolled { get; private set; }
+
         public void Suspend()
         {
             _raiseViewChanged = false;
+            HasBeenScrolled = false;
         }
 
         public void Resume()
@@ -112,7 +115,9 @@ namespace Telegram.Controls.Chats
                 ItemsPanelRoot.SizeChanged -= OnSizeChanged;
             }
 
+            _waitItemsPanelRoot.TrySetResult(false);
             _waitItemsPanelRoot = new();
+
             _raiseViewChanged = false;
 
             // Note, this is done because of the following:
@@ -133,10 +138,25 @@ namespace Telegram.Controls.Chats
         protected override void OnApplyTemplate()
         {
             ScrollingHost = (ScrollViewer)GetTemplateChild("ScrollViewer");
+
+            // Used by saved messages tab
+            ScrollingHost ??= this.GetParent<ScrollViewer>();
             ScrollingHost.ViewChanging += OnViewChanging;
             ScrollingHost.ViewChanged += OnViewChanged;
+            ScrollingHost.DirectManipulationStarted += OnDirectManipulationStarted;
+            ScrollingHost.AddHandler(PointerWheelChangedEvent, new PointerEventHandler(OnPointerWheelChanged), true);
 
             base.OnApplyTemplate();
+        }
+
+        private void OnDirectManipulationStarted(object sender, object e)
+        {
+            HasBeenScrolled = true;
+        }
+
+        private void OnPointerWheelChanged(object sender, PointerRoutedEventArgs e)
+        {
+            HasBeenScrolled = true;
         }
 
         private void OnSizeChanged(object sender, SizeChangedEventArgs e)
@@ -185,15 +205,15 @@ namespace Telegram.Controls.Chats
                     return;
                 }
 
-                var lastSlice = ViewModel.IsLastSliceLoaded != true;
-                var firstSlice = ViewModel.IsFirstSliceLoaded != true;
+                var lastSlice = ViewModel.IsSavedMessagesTab ? ViewModel.IsNewestSliceLoaded != true : ViewModel.IsOldestSliceLoaded != true;
+                var firstSlice = ViewModel.IsSavedMessagesTab ? ViewModel.IsOldestSliceLoaded != true : ViewModel.IsNewestSliceLoaded != true;
 
                 if (direction == PanelScrollingDirection.Backward
                     && panel.FirstCacheIndex == 0
                     && lastSlice)
                 {
                     Logger.Debug($"Going {direction}, loading history in the past");
-                    await ViewModel.LoadNextSliceAsync();
+                    await LoadNextSliceAsync();
                 }
                 else if (direction == PanelScrollingDirection.Forward
                     && panel.LastCacheIndex == ViewModel.Items.Count - 1)
@@ -205,7 +225,7 @@ namespace Telegram.Controls.Chats
                     if (lastSlice && panel.FirstVisibleIndex == 0)
                     {
                         Logger.Debug($"Going {direction}, loading history in the past");
-                        await ViewModel.LoadNextSliceAsync();
+                        await LoadNextSliceAsync();
                     }
 
                     if (panel.LastCacheIndex == ViewModel.Items.Count - 1)
@@ -218,11 +238,27 @@ namespace Telegram.Controls.Chats
             _loadMoreSemaphore.Release();
         }
 
+        private Task LoadNextSliceAsync()
+        {
+            if (ViewModel.IsSavedMessagesTab)
+            {
+                return ViewModel.LoadPreviousSliceAsync();
+            }
+
+            return ViewModel.LoadNextSliceAsync();
+        }
+
         private Task LoadPreviousSliceAsync(PanelScrollingDirection direction, bool firstSlice)
         {
             if (firstSlice)
             {
                 Logger.Debug($"Going {direction}, loading history in the future");
+
+                if (ViewModel.IsSavedMessagesTab)
+                {
+                    return ViewModel.LoadNextSliceAsync();
+                }
+
                 return ViewModel.LoadPreviousSliceAsync();
             }
 
@@ -263,6 +299,13 @@ namespace Telegram.Controls.Chats
                 _pendingMode = null;
                 _pendingForce = null;
                 return;
+            }
+
+            if (ViewModel.IsSavedMessagesTab)
+            {
+                mode = mode == ItemsUpdatingScrollMode.KeepLastItemInView
+                    ? ItemsUpdatingScrollMode.KeepItemsInView
+                    : ItemsUpdatingScrollMode.KeepLastItemInView;
             }
 
             if (mode == ItemsUpdatingScrollMode.KeepItemsInView && (force || scroll.VerticalOffset < 200))
@@ -318,7 +361,7 @@ namespace Telegram.Controls.Chats
             }
 
             // calculate the position object in order to know how much to scroll to
-            var transform = selectorItem.TransformToVisual((UIElement)scrollViewer.Content);
+            var transform = selectorItem.TransformToVisual(scrollViewer.ContentTemplateRoot);
             var position = transform.TransformPoint(new Point());
 
             if (alignment == VerticalAlignment.Top)
@@ -330,13 +373,34 @@ namespace Telegram.Controls.Chats
             }
             else if (alignment == VerticalAlignment.Center)
             {
-                if (selectorItem.ActualHeight < ActualHeight - 48)
+                Rect GetHighlightArea()
                 {
-                    position.Y -= (ActualHeight - selectorItem.ActualHeight) / 2d;
+                    if (options != null && options.Highlight)
+                    {
+                        if (selectorItem.ContentTemplateRoot is MessageSelector selector && selector.Content is MessageBubble bubble)
+                        {
+                            return bubble.Highlight(options);
+                        }
+                    }
+
+                    return new Rect(0, 0, selectorItem.ActualWidth, selectorItem.ActualHeight);
+                }
+
+                var occludedHeight = Delegate.AnimatedHeight;
+                var highlightArea = GetHighlightArea();
+
+                if (highlightArea.Height < ActualHeight - occludedHeight)
+                {
+                    position.Y -= (ActualHeight - highlightArea.Height - highlightArea.Y) / 2d + occludedHeight / 2;
+
+                    if (Delegate.HasMessagesPadding)
+                    {
+                        position.Y += occludedHeight;
+                    }
                 }
                 else
                 {
-                    position.Y -= 48 + 4;
+                    position.Y -= occludedHeight;
                 }
             }
             else if (alignment == VerticalAlignment.Bottom)
@@ -346,14 +410,6 @@ namespace Telegram.Controls.Chats
                 if (pixel is double adjust)
                 {
                     position.Y += adjust;
-                }
-            }
-
-            if (options != null && options.Highlight)
-            {
-                if (selectorItem.ContentTemplateRoot is MessageSelector selector && selector.Content is MessageBubble bubble)
-                {
-                    bubble.Highlight(options);
                 }
             }
 

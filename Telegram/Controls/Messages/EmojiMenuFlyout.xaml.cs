@@ -8,6 +8,7 @@ using System;
 using System.Numerics;
 using Telegram.Common;
 using Telegram.Controls.Drawers;
+using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
@@ -24,7 +25,6 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Media;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Controls.Messages
 {
@@ -504,7 +504,7 @@ namespace Telegram.Controls.Messages
             return a / (2 * MathF.Tan(180 / n * MathF.PI / 180));
         }
 
-        private void OnStatusContextRequested(UIElement sender, ItemContextRequestedEventArgs<Sticker> args)
+        private void OnStatusContextRequested(UIElement sender, ItemContextRequestedEventArgs<StickerViewModel> args)
         {
             var element = sender as FrameworkElement;
             var sticker = args.Item;
@@ -524,13 +524,11 @@ namespace Telegram.Controls.Messages
             args.ShowAt(flyout, element);
         }
 
-        private void OnStatusClick(object sender, ItemClickEventArgs e)
+        private void OnStatusClick(object sender, EmojiDrawerItemClickEventArgs e)
         {
             if (e.ClickedItem is StickerViewModel sticker)
             {
                 _popup.IsOpen = false;
-
-                EmojiSelected?.Invoke(this, new EmojiSelectedEventArgs(sticker.ToReactionType()));
 
                 if (_story != null)
                 {
@@ -542,43 +540,46 @@ namespace Telegram.Controls.Messages
                 }
                 else if (_mode == EmojiDrawerMode.EmojiStatus)
                 {
-                    if (sticker.FullType is StickerFullTypeCustomEmoji customEmoji)
-                    {
-                        _clientService.Send(new SetEmojiStatus(new EmojiStatus(new EmojiStatusTypeCustomEmoji(customEmoji.CustomEmojiId), 0)));
-                    }
-                    else
-                    {
-                        _clientService.Send(new SetEmojiStatus(null));
-                    }
+                    _clientService.Send(new SetEmojiStatus(new EmojiStatus(sticker.EmojiStatusType, 0)));
                 }
                 else if (_mode == EmojiDrawerMode.Reactions)
                 {
                     _clientService.Send(new SetDefaultReactionType(sticker.ToReactionType()));
                 }
+                else
+                {
+                    EmojiSelected?.Invoke(this, new EmojiSelectedEventArgs(sticker.ToReactionType()));
+                }
             }
         }
 
-        private void SetStatus((Sticker Sticker, int Duration) item)
+        private void SetStatus((StickerViewModel Sticker, int Duration) item)
         {
             if (_mode == EmojiDrawerMode.EmojiStatus && item.Sticker.FullType is StickerFullTypeCustomEmoji customEmoji)
             {
-                _clientService.Send(new SetEmojiStatus(new EmojiStatus(new EmojiStatusTypeCustomEmoji(customEmoji.CustomEmojiId), DateTime.Now.ToTimestamp() + item.Duration)));
+                _clientService.Send(new SetEmojiStatus(new EmojiStatus(item.Sticker.EmojiStatusType, DateTime.Now.ToTimestamp() + item.Duration)));
             }
         }
 
-        private async void ChooseStatus(Sticker sticker)
+        private async void ChooseStatus(StickerViewModel sticker)
         {
             var popup = new ChooseStatusDurationPopup();
 
             var confirm = await popup.ShowQueuedAsync(XamlRoot);
-            if (confirm == ContentDialogResult.Primary && _mode == EmojiDrawerMode.EmojiStatus && sticker.FullType is StickerFullTypeCustomEmoji customEmoji)
+            if (confirm == ContentDialogResult.Primary && _mode == EmojiDrawerMode.EmojiStatus)
             {
-                _clientService.Send(new SetEmojiStatus(new EmojiStatus(new EmojiStatusTypeCustomEmoji(customEmoji.CustomEmojiId), DateTime.Now.ToTimestamp() + popup.Value)));
+                _clientService.Send(new SetEmojiStatus(new EmojiStatus(sticker.EmojiStatusType, DateTime.Now.ToTimestamp() + popup.Value)));
             }
         }
 
         private async void StoryToggleReaction(ReactionType reaction)
         {
+            if (reaction is ReactionTypeCustomEmoji && !_story.ClientService.IsPremium)
+            {
+                ToastPopup.ShowFeaturePromo(WindowContext.GetNavigationService(this), new PremiumFeatureUniqueReactions());
+                return;
+            }
+
             if (_story.ChosenReactionType != null && _story.ChosenReactionType.AreTheSame(reaction))
             {
                 _story.ClientService.Send(new SetStoryReaction(_story.ChatId, _story.StoryId, null, true));
@@ -596,6 +597,12 @@ namespace Telegram.Controls.Messages
 
         private async void MessageToggleReaction(ReactionType reaction)
         {
+            if (reaction is ReactionTypeCustomEmoji && !_message.ClientService.IsPremium)
+            {
+                ToastPopup.ShowFeaturePromo(_message.Delegate.NavigationService, new PremiumFeatureUniqueReactions());
+                return;
+            }
+
             if (_message.InteractionInfo != null && _message.InteractionInfo.Reactions.IsChosen(reaction))
             {
                 _message.ClientService.Send(new RemoveMessageReaction(_message.ChatId, _message.Id, reaction));

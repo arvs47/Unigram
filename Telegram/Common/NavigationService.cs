@@ -43,11 +43,11 @@ namespace Telegram.Common
             }
         }
 
-        public static void NavigateToWebApp(this INavigationService service, User botUser, string url, long launchId = 0, AttachmentMenuBot menuBot = null, WebAppOpenMode openMode = null, Chat sourceChat = null, InternalLinkType sourceLink = null)
+        public static void NavigateToWebApp(this INavigationService service, User botUser, string url, long launchId = 0, AttachmentMenuBot menuBot = null, WebAppOpenMode openMode = null, Chat sourceChat = null, InternalLinkType sourceLink = null, string buttonText = null)
         {
             if (service is TLNavigationService serviceEx)
             {
-                serviceEx.NavigateToWebApp(botUser, url, launchId, menuBot, openMode, sourceChat, sourceLink);
+                serviceEx.NavigateToWebApp(botUser, url, launchId, menuBot, openMode, sourceChat, sourceLink, buttonText);
             }
         }
 
@@ -211,6 +211,14 @@ namespace Telegram.Common
             return Task.CompletedTask;
         }
 
+        public static void ShowPromo(this INavigationService service, PremiumFeature feature, PremiumSource source = null)
+        {
+            if (service is TLNavigationService serviceEx)
+            {
+                serviceEx.ShowPromo(feature, source);
+            }
+        }
+
         public static void RemoveChatFromStack(this INavigationService service, long target)
         {
             ChatMessageTopic peer;
@@ -252,9 +260,9 @@ namespace Telegram.Common
             return currentChat.ChatId == chatId && currentChat.MessageTopic.AreTheSame(topic);
         }
 
-        public static ChatMessageTopic GetChatFromBackStack(this INavigationService service, bool currentPageOnly = false, Type currentPageType = null)
+        public static ChatMessageTopic GetChatFromBackStack(this INavigationService service, bool currentPageOnly = false, params Type[] currentPageType)
         {
-            if (service.CurrentPageType == typeof(ChatPage) || service.CurrentPageType == currentPageType)
+            if (service.CurrentPageType == typeof(ChatPage) || Array.IndexOf(currentPageType, service.CurrentPageType) != -1)
             {
                 if (TryGetChatFromParameter(service, service.CurrentPageParam, out ChatMessageTopic chatId))
                 {

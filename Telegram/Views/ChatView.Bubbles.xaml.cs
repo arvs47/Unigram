@@ -28,7 +28,6 @@ using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Views
 {
@@ -38,11 +37,6 @@ namespace Telegram.Views
 
         private void OnViewSizeChanged(object sender, SizeChangedEventArgs e)
         {
-            MessagesHeaderRoot.MinHeight = Math.Max(0, Math.Truncate(Messages.ActualHeight - e.NewSize.Height));
-            //MessagesHeaderRoot.Padding = new Thickness(0, ClipperOuter.ActualHeight - DateHeaderRelative.ActualHeight, 0, 0);
-
-            //Logger.Info(MessagesHeaderRoot.Padding.Top);
-
             if (Messages.ScrollingHost.ScrollableHeight > 0)
             {
                 return;
@@ -60,7 +54,7 @@ namespace Telegram.Views
 
         private void UpdateArrowVisibility()
         {
-            if (ViewModel.Type is not DialogType.History and not DialogType.Thread and not DialogType.SavedMessagesTopic)
+            if (ViewModel.Type is not DialogType.History and not DialogType.Thread || ViewModel.IsSavedMessagesTab)
             {
                 Arrows.IsVisible = false;
                 return;
@@ -74,7 +68,7 @@ namespace Telegram.Views
 
             if (Messages.ScrollingHost == null || Messages.ScrollingHost.ScrollableHeight - Messages.ScrollingHost.VerticalOffset < 40)
             {
-                Arrows.IsVisible = ViewModel.IsFirstSliceLoaded == false;
+                Arrows.IsVisible = ViewModel.IsNewestSliceLoaded == false;
                 return;
             }
 
@@ -112,9 +106,10 @@ namespace Telegram.Views
             var minItem = 2;
             var minDate = true;
             var minDateIndex = panel.FirstVisibleIndex;
-            var minDateValue = 0L;
+            var minDateValue = DateTime.MaxValue;
+            var minDateScheduled = false;
 
-            var minMessageTopic = ViewModel.IsForum || ViewModel.IsFeedbackGroup;
+            var minMessageTopic = ViewModel.IsForum || ViewModel.IsDirectMessagesGroup;
             var minMessageTopicIndex = panel.FirstVisibleIndex;
             var minMessageTopicValue = default(MessageTopic);
 
@@ -163,31 +158,41 @@ namespace Telegram.Views
 
                     if (minItem == 2 && point.Y + container.ActualHeight >= 0)
                     {
-                        minItem = ViewModel.IsForum || ViewModel.IsFeedbackGroup ? 1 : 0;
-                        minDateValue = Math.Max(message.Id, message.Date);
+                        minItem = ViewModel.IsForum || ViewModel.IsDirectMessagesGroup ? 1 : 0;
 
-                        if (message.SchedulingState is MessageSchedulingStateSendAtDate sendAtDate)
+                        if (message.Content is MessageHeaderUnread)
                         {
-                            UpdateDateHeader(Formatter.ToLocalTime(sendAtDate.SendDate).Date, true);
+                            minDateValue = DateTime.MaxValue;
+                        }
+                        else if (message.SchedulingState is MessageSchedulingStateSendAtDate sendAtDate)
+                        {
+                            minDateValue = Formatter.ToLocalTime(sendAtDate.SendDate).Date;
+                            minDateScheduled = true;
                         }
                         else if (message.SchedulingState is MessageSchedulingStateSendWhenVideoProcessed sendWhenVideoProcessed)
                         {
-                            UpdateDateHeader(Formatter.ToLocalTime(sendWhenVideoProcessed.SendDate).Date, true);
+                            minDateValue = Formatter.ToLocalTime(sendWhenVideoProcessed.SendDate).Date;
+                            minDateScheduled = true;
                         }
                         else if (message.SchedulingState is MessageSchedulingStateSendWhenOnline)
                         {
-                            UpdateDateHeader(DateTime.MinValue, true);
+                            minDateValue = DateTime.MinValue;
+                            minDateScheduled = true;
                         }
                         else if (message.Date > 0)
                         {
-                            UpdateDateHeader(Formatter.ToLocalTime(message.Date).Date, false);
+                            minDateValue = Formatter.ToLocalTime(message.Date).Date;
                         }
                     }
 
                     if (minItem == 1 && point.Y + container.ActualHeight + DateHeader.ActualSize.Y + 4 >= 0)
                     {
                         minItem = 0;
-                        minMessageTopicValue = message.TopicId;
+
+                        if (message.Content is not MessageHeaderUnread)
+                        {
+                            minMessageTopicValue = message.TopicId;
+                        }
                     }
                 }
 
@@ -338,14 +343,21 @@ namespace Telegram.Views
                 _forumTopicHeader.Properties.InsertVector3("Translation", Vector3.Zero);
             }
 
+            // TODO: do not hide if above corresponding message
+
             _dateHeaderTimer.Stop();
             _dateHeaderTimer.Start();
-            ShowHideDateHeader(minDateValue > 0 && minDateIndex > 0, minDateValue > 0 && minDateIndex is > 0 and < int.MaxValue);
+            ShowHideDateHeader(minDateValue != DateTime.MaxValue && minDateIndex > 0, minDateValue != DateTime.MaxValue && minDateIndex is > 0 and < int.MaxValue);
             ShowHideForumTopicHeader(minMessageTopicValue != null && minMessageTopicIndex > 0, minMessageTopicValue != null && minMessageTopicIndex is > 0 and < int.MaxValue);
 
             if (minMessageTopicValue != null)
             {
                 UpdateForumTopicHeader(minMessageTopicValue);
+            }
+
+            if (minDateValue != DateTime.MaxValue)
+            {
+                UpdateDateHeader(minDateValue, minDateScheduled);
             }
 
             // Read and play messages logic:
@@ -356,8 +368,8 @@ namespace Telegram.Views
                     DialogType.EventLog => new MessageSourceChatEventLog(),
                     DialogType.Thread => ViewModel.ForumTopic != null
                         ? new MessageSourceForumTopicHistory()
-                        : ViewModel.FeedbackChatTopic != null
-                        ? new MessageSourceFeedbackChatTopicHistory()
+                        : ViewModel.DirectMessagesChatTopic != null
+                        ? new MessageSourceDirectMessagesChatTopicHistory()
                         : new MessageSourceMessageThreadHistory(),
                     _ => new MessageSourceChatHistory()
                 };
@@ -367,10 +379,6 @@ namespace Telegram.Views
                 if (ViewModel.ForumTopic != null)
                 {
                     messageThreadId = ViewModel.ForumTopic.Info.MessageThreadId;
-                }
-                else if (ViewModel.Thread != null)
-                {
-                    messageThreadId = ViewModel.Thread.MessageThreadId;
                 }
 
                 ViewModel.ClientService.ViewMessages(chat.Id, messageThreadId, messages, source, false);
@@ -387,14 +395,9 @@ namespace Telegram.Views
                 return;
             }
 
-            if (ViewModel.LockedPinnedMessageId < firstVisibleId)
+            if (ViewModel.Thread != null)
             {
-                ViewModel.LockedPinnedMessageId = 0;
-            }
-
-            if (ViewModel.Thread is MessageThreadInfo thread && ViewModel.ForumTopic == null)
-            {
-                var message = thread.Messages.LastOrDefault();
+                var message = ViewModel.Thread.Messages.LastOrDefault();
                 if (message == null || (firstVisibleId <= message.Id && lastVisibleId >= message.Id) || Messages.ScrollingHost.ScrollableHeight == 0)
                 {
                     PinnedMessage.UpdateMessage(ViewModel.Chat, null, false, 0, 1, false);
@@ -406,14 +409,10 @@ namespace Telegram.Views
             }
             else if (ViewModel.PinnedMessages.Count > 0)
             {
-                var currentPinned = ViewModel.LockedPinnedMessageId != 0
-                    ? ViewModel.PinnedMessages.LastOrDefault(x => x.Id < firstVisibleId) ?? ViewModel.PinnedMessages.LastOrDefault()
-                    : ViewModel.PinnedMessages.LastOrDefault(x => x.Id <= lastVisibleId) ?? ViewModel.PinnedMessages.FirstOrDefault();
+                var currentPinned = ViewModel.PinnedMessages.GetVisible(lastVisibleId, Messages.HasBeenScrolled);
                 if (currentPinned != null)
                 {
-                    //PinnedMessage.UpdateIndex(ViewModel.PinnedMessages.IndexOf(currentPinned), ViewModel.PinnedMessages.Count, intermediate);
-                    PinnedMessage.UpdateMessage(ViewModel.Chat, currentPinned, false,
-                        ViewModel.PinnedMessages.IndexOf(currentPinned), ViewModel.PinnedMessages.Count, intermediate);
+                    PinnedMessage.UpdateMessage(ViewModel.Chat, currentPinned, false, currentPinned.Index, ViewModel.PinnedMessages.TotalCount, intermediate);
                 }
                 else
                 {
@@ -542,6 +541,11 @@ namespace Telegram.Views
 
             if (ViewModel.ClientService.TryGetForumTopic(ViewModel.ChatId, messageTopic, out ForumTopic forumTopic))
             {
+                if (string.IsNullOrEmpty(forumTopic.Info.Name))
+                {
+                    _forumTopicHeaderTopic = null;
+                }
+
                 ForumTopicHeaderLabel.Text = forumTopic.Info.Name;
                 ForumTopicHeaderPhoto.Clear();
 
@@ -562,10 +566,10 @@ namespace Telegram.Views
                     ForumTopicHeaderIconText.Text = InitialNameStringConverter.Convert(forumTopic.Info.Name);
                 }
             }
-            else if (ViewModel.ClientService.TryGetFeedbackChatTopic(ViewModel.ChatId, messageTopic, out FeedbackChatTopic feedbackChatTopic))
+            else if (ViewModel.ClientService.TryGetDirectMessagesChatTopic(ViewModel.ChatId, messageTopic, out DirectMessagesChatTopic directMessagesChatTopic))
             {
-                ForumTopicHeaderLabel.Text = ViewModel.ClientService.GetTitle(feedbackChatTopic.SenderId);
-                ForumTopicHeaderPhoto.SetMessageSender(ViewModel.ClientService, feedbackChatTopic.SenderId, 16);
+                ForumTopicHeaderLabel.Text = ViewModel.ClientService.GetTitle(directMessagesChatTopic.SenderId);
+                ForumTopicHeaderPhoto.SetMessageSender(ViewModel.ClientService, directMessagesChatTopic.SenderId, 16);
 
                 ForumTopicHeaderTypeIcon.ClearStatus();
                 ForumTopicHeaderIconRoot.Visibility = Visibility.Collapsed;
@@ -585,11 +589,11 @@ namespace Telegram.Views
                     GalleryViewModelBase viewModel;
                     if (message.Content is MessageAnimation)
                     {
-                        viewModel = new ChatGalleryViewModel(ViewModel.ClientService, ViewModel.StorageService, ViewModel.Aggregator, message.ChatId, ViewModel.Topic, message);
+                        viewModel = new ChatGalleryViewModel(ViewModel.ClientService, ViewModel.StorageService, ViewModel.Aggregator, message.ChatId, ViewModel.Topic, message, null);
                     }
                     else
                     {
-                        viewModel = new StandaloneGalleryViewModel(ViewModel.ClientService, ViewModel.StorageService, ViewModel.Aggregator, new GalleryMessage(ViewModel.ClientService, message));
+                        viewModel = new StandaloneGalleryViewModel(ViewModel.ClientService, ViewModel.StorageService, ViewModel.Aggregator, new GalleryMessage(ViewModel.ClientService, message, null));
                     }
 
                     ViewModel.NavigationService.ShowGallery(viewModel, target);
@@ -607,7 +611,7 @@ namespace Telegram.Views
                 }
                 else
                 {
-                    if (_messageIdToSelector.TryGetValue(message.Id, out SelectorItem container))
+                    if (_messageIdToSelector.TryGetValue(message.Id, out ChatHistoryViewItem container))
                     {
                         Play(new (SelectorItem, MessageViewModel)[] { (container, message) });
                     }
@@ -674,18 +678,19 @@ namespace Telegram.Views
                 : next != null ? next.Keys
                 : prev;
 
-            if (skip != null)
-            {
-                foreach (var item in _prev.Keys.Except(skip).ToList())
-                {
-                    var presenter = _prev[item].Target as IPlayerView;
-                    if (presenter != null && presenter.LoopCount == 0)
-                    {
-                        presenter.ViewportChanged(false);
-                    }
+            var source = skip != null
+                ? _prev.Keys.Except(skip).ToList()
+                : _prev.Keys.ToList();
 
-                    _prev.Remove(item);
+            foreach (var item in source)
+            {
+                var presenter = _prev[item].Target as IPlayerView;
+                if (presenter != null && presenter.LoopCount == 0)
+                {
+                    presenter.ViewportChanged(false);
                 }
+
+                _prev.Remove(item);
             }
 
             if (next != null)
@@ -708,19 +713,20 @@ namespace Telegram.Views
 
 
 
-        private readonly Dictionary<long, SelectorItem> _albumIdToSelector = new();
-        private readonly Dictionary<long, SelectorItem> _messageIdToSelector = new();
+        private readonly Dictionary<long, ChatHistoryViewItem> _albumIdToSelector = new();
+        private readonly Dictionary<long, ChatHistoryViewItem> _messageIdToSelector = new();
         private readonly MultiValueDictionary<long, long> _messageIdToMessageIds = new();
+
+        private readonly MultiValueDictionary<long, ChatHistoryViewItem> _messageTopicToSelectors = new();
 
         private readonly Dictionary<ChatHistoryViewItemType, ChoosingItemStrategy> _typeToStrategy = new();
 
-        class ChoosingItemStrategy
+        record ChoosingItemStrategy
         {
-            public ChoosingItemStrategy(DataTemplate itemTemplate, int minimum = 0)
+            public ChoosingItemStrategy(DataTemplate itemTemplate)
             {
                 Queue = new();
                 ItemTemplate = itemTemplate;
-                Minimum = minimum;
             }
 
             public DataTemplate ItemTemplate { get; }
@@ -728,8 +734,19 @@ namespace Telegram.Views
             public HashSet<SelectorItem> Queue { get; }
 
             public int TotalCount { get; set; }
+        }
 
-            public int Minimum { get; set; }
+        public string GetVirtualizationInfo()
+        {
+            if (Messages.ItemsPanelRoot is ItemsStackPanel panel)
+            {
+                var queued = _typeToStrategy.Values.Sum(x => x.Queue.Count);
+                var total = _typeToStrategy.Values.Sum(x => x.TotalCount);
+                var cached = panel.LastCacheIndex + panel.FirstCacheIndex + 1;
+                return string.Format(", [{0}-{1}] {2}/{3}{4}", panel.FirstCacheIndex, panel.LastCacheIndex, queued, total, total - queued - cached > 0 ? $", {total - queued - cached} missing" : "");
+            }
+
+            return string.Empty;
         }
 
         private void OnChoosingItemContainer(ListViewBase sender, ChoosingItemContainerEventArgs args)
@@ -752,23 +769,9 @@ namespace Telegram.Views
                     // TODO: threshold could be made dynamic...
                     // By example if we are in a channel and typeName is UserMessageTemplate, we can just override
                     // Same thing should probably apply to all service messages.
-                    bool ShouldCreateNewContainer()
-                    {
-                        if (relevantHashSet.Queue.Count > 0)
-                        {
-                            return true;
-                        }
-
-                        if (relevantHashSet.Minimum > 0 && relevantHashSet.TotalCount < relevantHashSet.Minimum)
-                        {
-                            return true;
-                        }
-
-                        return false;
-                    }
 
                     // Code inside this branch is the one recommended by Microsoft, that bugs in some scenarios.
-                    if (ShouldCreateNewContainer())
+                    if (relevantHashSet.Queue.Count > 0)
                     {
                         // The ItemContainer's datatemplate does not match the needed
                         // datatemplate.
@@ -784,7 +787,6 @@ namespace Telegram.Views
 
                         selector.TypeName = typeName;
                         selector.ContentTemplate = relevantHashSet.ItemTemplate;
-                        selector.Style = sender.ItemContainerStyle;
 
                         // Remove the container from the old queue and update the counter.
                         recycledHashSet.Queue.Remove(args.ItemContainer);
@@ -828,12 +830,14 @@ namespace Telegram.Views
 
         private void OnContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
         {
+            args.Handled = true;
+
             if (args.Item is not MessageViewModel message || args.ItemContainer is not ChatHistoryViewItem container)
             {
                 return;
             }
 
-            UpdateCache(message, args.ItemContainer, args.InRecycleQueue);
+            UpdateCache(message, container, args.InRecycleQueue);
 
             if (args.InRecycleQueue)
             {
@@ -843,17 +847,43 @@ namespace Telegram.Views
                 if (args.ItemContainer.ContentTemplateRoot is MessageSelector selector)
                 {
                     selector.Recycle();
+
+                    if (_sizeChangedHandler != null)
+                    {
+                        selector.SizeChanged -= _sizeChangedHandler;
+                    }
                 }
 
-                if (_sizeChangedHandler != null)
+                if (message.Content is MessageHeaderUnread)
                 {
-                    args.ItemContainer.SizeChanged -= _sizeChangedHandler;
+                    args.ItemContainer.EffectiveViewportChanged -= HeaderUnread_EffectiveViewportChanged;
                 }
 
-                return;
+                if (_oldestItem == container)
+                {
+                    _oldestItem = null;
+                    _oldestItemAsHeader = null;
+                    container.UpdatePadding(0, -1);
+
+                    UpdateOldestItemAsHeader(false);
+                }
+
+                if (_newestItem == container)
+                {
+                    _newestItem = null;
+                    _newestItemAsFooter = null;
+                    container.UpdatePadding(-1, 0);
+
+                    UpdateNewestItemAsFooter(false);
+                }
             }
             else
             {
+                if (message.Content is MessageHeaderUnread)
+                {
+                    args.ItemContainer.EffectiveViewportChanged += HeaderUnread_EffectiveViewportChanged;
+                }
+
                 var content = args.ItemContainer.ContentTemplateRoot as FrameworkElement;
                 if (content == null)
                 {
@@ -862,23 +892,26 @@ namespace Telegram.Views
 
                 if (content is MessageService service)
                 {
+                    if (message.Content is MessageHeaderUnread)
+                    {
+                        args.RegisterUpdateCallback(2, RegisterEvents);
+                    }
+
                     service.UpdateMessage(args.Item as MessageViewModel);
-                    args.Handled = true;
                 }
                 else if (content is MessageSelector checkbox)
                 {
                     // TODO: are there chances that at this point TextArea is not up to date yet?
                     checkbox.PrepareForItemOverride(message,
                         _viewModel.Type is DialogType.History or DialogType.Thread or DialogType.ScheduledMessages
-                        && TextArea.Visibility == Visibility.Visible);
+                        && _replyEnabled is true);
 
                     if (checkbox.Content is MessageBubble bubble)
                     {
-                        bubble.UpdateQuery(ViewModel.Search?.Query);
+                        bubble.UpdateQuery(ViewModel.Search?.Query, false);
                         bubble.UpdateMessage(args.Item as MessageViewModel);
 
                         args.RegisterUpdateCallback(2, RegisterEvents);
-                        args.Handled = true;
                     }
 
                     checkbox.UpdateMessage(message, Messages, ViewModel.IsSelectionEnabled);
@@ -886,16 +919,56 @@ namespace Telegram.Views
                         ? HorizontalAlignment.Center
                         : HorizontalAlignment.Stretch;
                 }
+
+                if (ViewModel.IsSavedMessagesTab)
+                {
+                    return;
+                }
+
+                void UpdateNewestOldest(bool? needed, bool? loaded, ref ChatHistoryViewItem item, ref ChatHistoryViewItem headerFooter, Index index)
+                {
+                    if (args.ItemIndex == (index.IsFromEnd ? ViewModel.Items.Count - index.Value : index.Value) && loaded is true)
+                    {
+                        item = container;
+
+                        if (needed is true)
+                        {
+                            headerFooter?.UpdatePadding(index.IsFromEnd ? -1 : 0, index.IsFromEnd ? 0 : -1);
+
+                            headerFooter = container;
+                            headerFooter.UpdatePadding(index.IsFromEnd ? -1 : _messagesScrollBarPadding, index.IsFromEnd ? _messagesHeaderRootPadding : -1);
+                        }
+                    }
+                    else
+                    {
+                        container.UpdatePadding(index.IsFromEnd ? -1 : 0, index.IsFromEnd ? 0 : -1);
+                    }
+                }
+
+                UpdateNewestOldest(_oldestItemAsHeaderNeeded, ViewModel.IsOldestSliceLoaded, ref _oldestItem, ref _oldestItemAsHeader, 0);
+                UpdateNewestOldest(_newestItemAsFooterNeeded, ViewModel.IsNewestSliceLoaded, ref _newestItem, ref _newestItemAsFooter, ^1);
             }
         }
 
         private void RegisterEvents(ListViewBase sender, ContainerContentChangingEventArgs args)
         {
-            args.ItemContainer.SizeChanged += _sizeChangedHandler ??= new SizeChangedEventHandler(Item_SizeChanged);
             args.Handled = true;
+
+            if (args.Item is MessageViewModel { Content: MessageHeaderUnread })
+            {
+                _headerUnreadNotReady = false;
+
+                if (_headerUnreadRetry)
+                {
+                    UpdateMessagesHeaderPadding();
+                }
+
+                return;
+            }
 
             if (args.ItemContainer.ContentTemplateRoot is MessageSelector selector && selector.Content is MessageBubble bubble)
             {
+                selector.SizeChanged += _sizeChangedHandler ??= new SizeChangedEventHandler(Item_SizeChanged);
                 bubble.RegisterEvents();
             }
         }
@@ -921,13 +994,9 @@ namespace Telegram.Views
                 return;
             }
 
-            var index = Messages.IndexFromContainer(sender as SelectorItem);
-            if (index < panel.LastVisibleIndex && e.PreviousSize.Width < 1 && e.PreviousSize.Height < 1)
-            {
-                return;
-            }
+            var selector = sender as MessageSelector;
 
-            var message = Messages.ItemFromContainer(sender as SelectorItem) as MessageViewModel;
+            var message = selector?.Message;
             if (message == null || message.IsInitial)
             {
                 if (message != null && e.PreviousSize.Width > 0 && e.PreviousSize.Height > 0)
@@ -940,7 +1009,26 @@ namespace Telegram.Views
                 }
             }
 
-            if (index >= panel.FirstVisibleIndex && index <= panel.LastVisibleIndex && sender is SelectorItem selector)
+            var index = _messages.IndexOf(message);
+            if (index < panel.LastVisibleIndex && e.PreviousSize.Width < 1 && e.PreviousSize.Height < 1)
+            {
+                return;
+            }
+
+            var container = ContainerFromItem(message.Id);
+            if (container == null)
+            {
+                return;
+            }
+
+            AnimateSizeChanged(panel, container, index, prev, next);
+        }
+
+        private void AnimateSizeChanged(ItemsStackPanel panel, SelectorItem selector, int index, Vector2 prev, Vector2 next)
+        {
+            var diff = next.Y - prev.Y;
+
+            if (index >= panel.FirstVisibleIndex && index <= panel.LastVisibleIndex)
             {
                 var direction = panel.ItemsUpdatingScrollMode == ItemsUpdatingScrollMode.KeepItemsInView ? -1 : 1;
                 var edge = (index == panel.LastVisibleIndex && direction == 1) || index == panel.FirstVisibleIndex && direction == -1;
@@ -1017,6 +1105,10 @@ namespace Telegram.Views
                 else if (message.Content is MessageHeaderMessageTopic)
                 {
                     return ChatHistoryViewItemType.ServiceForumTopic;
+                }
+                else if (message.Content is MessageHeaderAccountInfo)
+                {
+                    return ChatHistoryViewItemType.ServiceAccountInfo;
                 }
 
                 return ChatHistoryViewItemType.Service;
@@ -1099,6 +1191,20 @@ namespace Telegram.Views
             }
         }
 
+        public void UpdateServiceWithForumTopic(long forumTopicId, Action<MessageService> action)
+        {
+            if (_messageTopicToSelectors.TryGetValue(forumTopicId, out var containers))
+            {
+                foreach (var container in containers)
+                {
+                    if (container.ContentTemplateRoot is MessageService service)
+                    {
+                        action(service);
+                    }
+                }
+            }
+        }
+
         public void ForEach(Action<MessageBubble, MessageViewModel> action)
         {
             foreach (var item in _messageIdToSelector)
@@ -1126,7 +1232,7 @@ namespace Telegram.Views
 
         public void UpdateMessageSendSucceeded(long oldMessageId, MessageViewModel message)
         {
-            if (_messageIdToSelector.TryGetValue(oldMessageId, out SelectorItem container))
+            if (_messageIdToSelector.TryGetValue(oldMessageId, out ChatHistoryViewItem container))
             {
                 _messageIdToSelector[message.Id] = container;
                 _messageIdToSelector.Remove(oldMessageId);
@@ -1139,7 +1245,7 @@ namespace Telegram.Views
             }
         }
 
-        private void UpdateCache(MessageViewModel message, SelectorItem container, bool recycle)
+        private void UpdateCache(MessageViewModel message, ChatHistoryViewItem container, bool recycle)
         {
             if (recycle)
             {
@@ -1151,6 +1257,9 @@ namespace Telegram.Views
 
                 if (message.ReplyTo is MessageReplyToMessage replyToMessage)
                     _messageIdToMessageIds.Remove(replyToMessage.MessageId, message.Id);
+
+                if (message.Content is MessageHeaderMessageTopic && message.TopicId is MessageTopicForum messageTopicForum)
+                    _messageTopicToSelectors.Remove(messageTopicForum.ForumTopicId, container);
             }
             else
             {
@@ -1162,6 +1271,9 @@ namespace Telegram.Views
 
                 if (message.ReplyTo is MessageReplyToMessage replyToMessage)
                     _messageIdToMessageIds.Add(replyToMessage.MessageId, message.Id);
+
+                if (message.Content is MessageHeaderMessageTopic && message.TopicId is MessageTopicForum messageTopicForum)
+                    _messageTopicToSelectors.Add(messageTopicForum.ForumTopicId, container);
             }
         }
     }

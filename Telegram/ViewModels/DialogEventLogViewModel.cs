@@ -22,8 +22,8 @@ namespace Telegram.ViewModels
 {
     public partial class DialogEventLogViewModel : DialogViewModel
     {
-        public DialogEventLogViewModel(IClientService clientService, ISettingsService settingsService, IEventAggregator aggregator, ILocationService locationService, INotificationsService pushService, IPlaybackService playbackService, IVoipService voipService, INetworkService networkService, IStorageService storageService, ITranslateService translateService)
-            : base(clientService, settingsService, aggregator, locationService, pushService, playbackService, voipService, networkService, storageService, translateService)
+        public DialogEventLogViewModel(IClientService clientService, ISettingsService settingsService, IEventAggregator aggregator, ILocationService locationService, INotificationsService pushService, IVoipService voipService, INetworkService networkService, IStorageService storageService, ITranslateService translateService)
+            : base(clientService, settingsService, aggregator, locationService, pushService, voipService, networkService, storageService, translateService)
         {
         }
 
@@ -128,8 +128,8 @@ namespace Telegram.ViewModels
                 }
 
                 _loadingSlice = true;
-                IsLastSliceLoaded = null;
-                IsFirstSliceLoaded = null;
+                IsOldestSliceLoaded = null;
+                IsNewestSliceLoaded = null;
                 IsLoading = true;
 
                 System.Diagnostics.Debug.WriteLine("DialogViewModel: LoadScheduledSliceAsync");
@@ -150,8 +150,8 @@ namespace Telegram.ViewModels
 
                     Items.RawReplaceWith(replied);
 
-                    IsLastSliceLoaded = false;
-                    IsFirstSliceLoaded = true;
+                    IsOldestSliceLoaded = false;
+                    IsNewestSliceLoaded = true;
                 }
 
                 _loadingSlice = false;
@@ -175,7 +175,7 @@ namespace Telegram.ViewModels
                     return;
                 }
 
-                if (_loadingSlice || Items.Count < 1 || IsLastSliceLoaded == true)
+                if (_loadingSlice || Items.Count < 1 || IsOldestSliceLoaded == true)
                 {
                     return;
                 }
@@ -199,7 +199,7 @@ namespace Telegram.ViewModels
                     ProcessMessages(chat, replied);
 
                     Items.RawInsertRange(0, replied, false, out bool empty);
-                    IsLastSliceLoaded = empty;
+                    IsOldestSliceLoaded = empty;
 
                     if (empty)
                     {
@@ -236,7 +236,7 @@ namespace Telegram.ViewModels
                 }
             }
 
-            return new Message(chatEvent.Id, sender, chatId, null, null, false, false, false, false, false, isChannel, false, chatEvent.Date, 0, null, null, null, null, null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, null, null);
+            return new Message(chatEvent.Id, sender, chatId, null, null, false, false, false, false, false, isChannel, false, false, false, chatEvent.Date, 0, null, null, null, null, null, null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, null, null);
         }
 
         private MessageViewModel GetMessage(long chatId, bool isChannel, ChatEvent chatEvent, bool child = false)
@@ -370,7 +370,7 @@ namespace Telegram.ViewModels
             if (item.Action is ChatEventDescriptionChanged descriptionChanged)
             {
                 var text = new FormattedText(descriptionChanged.NewDescription, Array.Empty<TextEntity>());
-                var linkPreview = string.IsNullOrEmpty(descriptionChanged.OldDescription) ? null : new LinkPreview { SiteName = Strings.EventLogPreviousGroupDescription, Description = new FormattedText { Text = descriptionChanged.OldDescription } };
+                var linkPreview = string.IsNullOrEmpty(descriptionChanged.OldDescription) ? null : new LinkPreview { SiteName = Strings.EventLogPreviousGroupDescription, Description = descriptionChanged.OldDescription.AsFormattedText() };
 
                 return new MessageText(text, linkPreview, null);
             }
@@ -379,7 +379,7 @@ namespace Telegram.ViewModels
                 var link = string.IsNullOrEmpty(usernameChanged.NewUsername) ? string.Empty : MeUrlPrefixConverter.Convert(ClientService, usernameChanged.NewUsername);
 
                 var text = new FormattedText(link, new[] { new TextEntity(0, link.Length, new TextEntityTypeUrl()) });
-                var linkPreview = string.IsNullOrEmpty(usernameChanged.OldUsername) ? null : new LinkPreview { SiteName = Strings.EventLogPreviousLink, Description = new FormattedText { Text = MeUrlPrefixConverter.Convert(ClientService, usernameChanged.OldUsername) } };
+                var linkPreview = string.IsNullOrEmpty(usernameChanged.OldUsername) ? null : new LinkPreview { SiteName = Strings.EventLogPreviousLink, Description = MeUrlPrefixConverter.Convert(ClientService, usernameChanged.OldUsername).AsFormattedText() };
 
                 return new MessageText(text, linkPreview, null);
             }
@@ -847,7 +847,7 @@ namespace Telegram.ViewModels
             return new MessageChatEvent(item);
         }
 
-        private string GetUserName(BaseObject sender, List<TextEntity> entities, int offset)
+        private string GetUserName(Object sender, List<TextEntity> entities, int offset)
         {
             if (sender is User user)
             {

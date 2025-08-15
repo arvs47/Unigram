@@ -69,6 +69,42 @@
                     <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.ForumTabsDebug, Mode=TwoWay}"
                               Content="Forum Tabs Debug"
                               Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.BubbleTailDebug, Mode=TwoWay}"
+                              Content="Bubble Tail Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.SpoilerEffectDebug, Mode=TwoWay}"
+                              Content="Spoiler Effect Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.WindowResizeDebug, Mode=TwoWay}"
+                              Content="Window Resize Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.SparseMessagesDebug, Mode=TwoWay}"
+                              Content="Sparse Messages Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.SavedMessagesDebug, Mode=TwoWay}"
+                              Content="Saved Messages Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.DeleteFilesDebug, Mode=TwoWay}"
+                              Content="Delete Files Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.MediaServerDebug, Mode=TwoWay}"
+                              Content="Media Server Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.AlbumPreloadDebug, Mode=TwoWay}"
+                              Content="Album Preload Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
+
+                    <CheckBox IsChecked="{x:Bind services:SettingsService.Current.Diagnostics.VideoPreloadDebug, Mode=TwoWay}"
+                              Content="Video Preload Debug"
+                              Style="{StaticResource SettingsCheckBoxStyle}" />
                 </controls:HeaderedControl>
 
                 <controls:HeaderedControl Header="Crash Mitigation">
@@ -123,9 +159,13 @@
                                           ItemsSource="{x:Bind ViewModel.Tags}">
                     <controls:HeaderedControl.ItemTemplate>
                         <DataTemplate x:DataType="viewModels:DiagnosticsTag">
-                            <controls:BadgeButton Click="{x:Bind Change}"
-                                                  Content="{x:Bind Name}"
-                                                  Badge="{x:Bind Text, Mode=OneWay}" />
+                            <controls:BadgeButton Content="{x:Bind Name}">
+                                <controls:BadgeButton.Badge>
+                                    <controls:SettingsComboBox ItemsSource="{x:Bind VerbosityOptions}"
+                                                               SelectedIndex="{x:Bind Verbosity, Mode=TwoWay}"
+                                                               DisplayMemberPath="Text" />
+                                </controls:BadgeButton.Badge>
+                            </controls:BadgeButton>
                         </DataTemplate>
                     </controls:HeaderedControl.ItemTemplate>
                 </controls:HeaderedControl>

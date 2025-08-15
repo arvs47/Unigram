@@ -5,7 +5,6 @@
 // file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
 //
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Telegram.Controls;
 using Telegram.Navigation.Services;
@@ -112,8 +111,6 @@ namespace Telegram.Navigation
         public virtual INavigationService NavigationService { get; set; }
 
         public virtual IDispatcherContext Dispatcher { get; set; }
-
-        public virtual IDictionary<string, object> SessionState { get; set; }
 
         #region Popups
 

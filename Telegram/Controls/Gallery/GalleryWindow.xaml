@@ -15,8 +15,7 @@
                         VerticalAlignment="Stretch"
                         Loaded="OnLoaded"
                         Unloaded="OnUnloaded"
-                        PreviewKeyDown="OnPreviewKeyDown"
-                        ProcessKeyboardAccelerators="OnProcessKeyboardAccelerators">
+                        PreviewKeyDown="OnPreviewKeyDown">
 
     <Grid RequestedTheme="Dark">
         <Grid>
@@ -68,6 +67,14 @@
                               Margin="0,-40,0,0"
                               Width="48"
                               Height="40" />
+
+        <local:GallerySponsoredContent x:Name="Sponsored"
+                                       Stroke="{ThemeResource AccentButtonBackground}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Top"
+                                       Visibility="Collapsed"
+                                       MaxWidth="320"
+                                       Margin="0,0,0,12" />
 
         <local:GalleryBottomPanel x:Name="BottomPanel"
                                   GotFocus="Transport_GotFocus"
@@ -134,6 +141,8 @@
                         MinWidth="320">
                 <local:GalleryTransportControls x:Name="Controls"
                                                 TabIndex="0"
+                                                PointerEntered="Controls_PointerEntered"
+                                                PointerExited="Controls_PointerExited"
                                                 FullScreenClick="FullScreen_Click"
                                                 CompactClick="Compact_Click"
                                                 MaxWidth="396"

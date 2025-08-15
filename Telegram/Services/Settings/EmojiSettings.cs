@@ -6,6 +6,7 @@
 //
 using System.Collections.Generic;
 using System.Text;
+using Telegram.Common;
 
 namespace Telegram.Services.Settings
 {
@@ -44,16 +45,47 @@ namespace Telegram.Services.Settings
             }
         }
 
-        public void AddRecentEmoji(string code)
+        public bool HasSkinTone(EmojiSkinData data)
+        {
+            return _container.Values.ContainsKey("Skin" + data.Emoji);
+        }
+
+        public void SetEmojiSkinTone(EmojiSkinData data)
+        {
+            AddOrUpdateValue("Skin" + data.Emoji, ((long)data.Tone1 << 32) | (uint)data.Tone2);
+        }
+
+        public EmojiSkinData GetEmojiSkinTone(string code)
+        {
+            // TODO: does it make sense to cache values for fast access?
+
+            var tones = GetValueOrDefault("Skin" + code, (0L << 32) | 0u);
+            int tone1 = (int)(tones >> 32);
+            int tone2 = (int)tones;
+
+            if (Emoji.EmojiGroupInternal._doubleSkinEmojis.Contains(code))
+            {
+                return new EmojiSkinData(code, (EmojiSkinTone)tone1, (EmojiSkinTone)tone2);
+            }
+
+            return new EmojiSkinData(code, (EmojiSkinTone)tone1);
+        }
+
+        public void AddRecentEmoji(EmojiData emoji)
+        {
+            AddRecentEmoji(emoji.Emoji);
+        }
+
+        public void AddRecentEmoji(string emoji, long customEmojiId)
+        {
+            AddRecentEmoji($"{emoji};{customEmojiId}");
+        }
+
+        private void AddRecentEmoji(string code)
         {
             lock (_recentEmojiLock)
             {
                 LoadRecentEmoji();
-
-                foreach (var modifier in _modifiers)
-                {
-                    code = code.Replace(modifier, string.Empty);
-                }
 
                 _emojiUseHistory.TryGetValue(code, out int count);
 

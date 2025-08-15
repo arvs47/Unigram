@@ -17,7 +17,6 @@ using Telegram.Td;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Windows.Storage;
-using TimeZone = Telegram.Td.Api.TimeZone;
 
 namespace Telegram.Services
 {
@@ -28,21 +27,21 @@ namespace Telegram.Services
 
         //void Send(Function function);
         //void Send(Function function, ClientResultHandler handler);
-        void Send(Function function, Action<BaseObject> handler = null);
-        Task<BaseObject> SendAsync(Function function);
-        Task<BaseObject> SendPaymentAsync(long starCount, Function function);
+        void Send(Function function, Action<Object> handler = null);
+        Task<Object> SendAsync(Function function);
+        Task<Object> SendPaymentAsync(long starCount, Function function);
 
-        void GetReplyTo(MessageViewModel message, Action<BaseObject> handler);
-        void GetStory(long storyPosterChatId, int storyId, Action<BaseObject> handler);
+        void GetReplyTo(MessageViewModel message, Action<Object> handler);
+        void GetStory(long storyPosterChatId, int storyId, Action<Object> handler);
 
-        Task<BaseObject> CheckChatInviteLinkAsync(string inviteLink);
+        Task<Object> CheckChatInviteLinkAsync(string inviteLink);
 
         Task<File> GetFileAsync(int fileId);
         Task<StorageFile> GetFileAsync(File file, bool completed = true);
         Task<StorageFile> GetPermanentFileAsync(File file);
 
-        void DownloadFile(int fileId, int priority, int offset = 0, int limit = 0, bool synchronous = false);
-        Task<File> DownloadFileAsync(File file, int priority, int offset = 0, int limit = 0);
+        void DownloadFile(int fileId, int priority, long offset = 0, long limit = 0, bool synchronous = false);
+        Task<File> DownloadFileAsync(File file, int priority, long offset = 0, long limit = 0);
 
         void AddFileToDownloads(File file, long chatId, long messageId, int priority = 30);
         void CancelDownloadFile(File file, bool onlyIfPending = false);
@@ -52,9 +51,11 @@ namespace Telegram.Services
 
         Task<Chats> GetChatListAsync(ChatList chatList, int offset, int limit);
 
+        void LoadFullInfo(Chat chat);
+
         void ViewMessages(long chatId, long messageThreadId, IList<long> messageIds, MessageSource source, bool forceRead);
 
-        Task<BaseObject> GetStarTransactionsAsync(MessageSender ownerId, string subscriptionId, StarTransactionDirection direction, string offset, int limit);
+        Task<Object> GetStarTransactionsAsync(MessageSender ownerId, string subscriptionId, TransactionDirection direction, string offset, int limit);
 
         Sticker NextGreetingSticker();
 
@@ -118,7 +119,7 @@ namespace Telegram.Services
         string GetTitle(Chat chat, bool tiny = false);
         string GetTitle(long chatId, bool tiny = false);
         string GetTitle(MessageOrigin origin, MessageImportInfo import);
-        string GetTitle(MessageSender sender);
+        string GetTitle(MessageSender sender, bool firstName = false);
 
         IList<ChatFolderInfo> GetChatFolders(Chat chat);
 
@@ -147,7 +148,7 @@ namespace Telegram.Services
         bool IsSavedMessages(Chat chat);
 
         bool IsForum(Chat chat);
-        bool IsFeedbackGroup(Chat chat);
+        bool IsDirectMessagesGroup(Chat chat);
         bool HasTabs(Chat chat);
 
         bool IsPaid(Chat chat);
@@ -159,12 +160,15 @@ namespace Telegram.Services
 
         bool CanPostMessages(Chat chat);
         bool CanInviteUsers(Chat chat);
+        bool CanPromoteMembers(Chat chat);
 
-        BaseObject GetMessageSender(MessageSender sender);
+        Object GetMessageSender(MessageSender sender);
+        bool TryGetMessageSender(MessageSender sender, out Object value);
 
         bool TryGetChat(long chatId, out Chat chat);
         bool TryGetChat(MessageSender sender, out Chat value);
         bool TryGetChat(AffiliateType type, out Chat value);
+        bool TryGetChat(SavedMessagesTopicType type, out Chat chat);
 
         bool TryGetChatFromUser(long userId, out long value);
         bool TryGetChatFromUser(long userId, out Chat value);
@@ -229,6 +233,8 @@ namespace Telegram.Services
         bool IsStickerFavorite(int id);
         bool IsStickerSetInstalled(long id);
 
+        bool TryGetMediaAlbum(long chatId, long mediaAlbumId, out MessageAlbumLastMessage album);
+
         ICollection<ChatListUnreadCount> UnreadCounts { get; }
         ChatListUnreadCount GetUnreadCount(ChatList chatList);
 
@@ -270,7 +276,7 @@ namespace Telegram.Services
 
         private readonly ConcurrentDictionary<long, MessageEffect> _effects = new();
 
-        private readonly Action<BaseObject> _processFilesDelegate;
+        private readonly Action<Object> _processFilesDelegate;
 
         private readonly Dictionary<long, Chat> _chats = new();
         private readonly ConcurrentDictionary<long, ConcurrentDictionary<MessageSender, ChatAction>> _chatActions = new();
@@ -292,6 +298,8 @@ namespace Telegram.Services
         private readonly ConcurrentDictionary<int, ChatListUnreadCount> _unreadCounts = new();
 
         private readonly Dictionary<int, File> _files = new();
+
+        private readonly ConcurrentDictionary<long, MessageAlbumLastMessageService> _lastMessageAlbums = new();
 
         private UnconfirmedSession _unconfirmedSession;
 
@@ -357,7 +365,7 @@ namespace Telegram.Services
             _options = new OptionsService(this);
             _aggregator = aggregator;
 
-            _processFilesDelegate = new Action<BaseObject>(ProcessFiles);
+            _processFilesDelegate = new Action<Object>(ProcessFiles);
 
             Initialize(online);
         }
@@ -400,7 +408,11 @@ namespace Telegram.Services
                 }
             }
 
+#if TD_CX
             _client = Client.Create(this);
+#else
+            _client = new Client(this);
+#endif
 
 #if MOCKUP
             ProfilePhoto ProfilePhoto(string name)
@@ -574,11 +586,6 @@ namespace Telegram.Services
                 var level = Client.Execute(new GetLogTagVerbosityLevel(tag)) as LogVerbosityLevel;
 
                 var saved = _settings.Diagnostics.GetValueOrDefault(tag, -1);
-                if (tag == "td_init")
-                {
-                    saved = 1;
-                }
-
                 if (saved != level.VerbosityLevel && saved > -1)
                 {
                     Client.Execute(new SetLogTagVerbosityLevel(tag, saved));
@@ -640,7 +647,7 @@ namespace Telegram.Services
             });
         }
 
-        private void UpdateConfig(BaseObject value)
+        private void UpdateConfig(Object value)
         {
             if (value is JsonValueObject obj)
             {
@@ -877,7 +884,7 @@ namespace Telegram.Services
 
 
 
-        public void Send(Function function, Action<BaseObject> handler = null)
+        public void Send(Function function, Action<Object> handler = null)
         {
             if (handler != null)
             {
@@ -889,12 +896,12 @@ namespace Telegram.Services
             }
         }
 
-        public Task<BaseObject> SendAsync(Function function)
+        public Task<Object> SendAsync(Function function)
         {
             return _client.SendAsync(function, _processFilesDelegate);
         }
 
-        public async Task<BaseObject> SendPaymentAsync(long starCount, Function function)
+        public async Task<Object> SendPaymentAsync(long starCount, Function function)
         {
             if (OwnedStarCount.StarCount < starCount)
             {
@@ -910,12 +917,16 @@ namespace Telegram.Services
 
 
 
-        public void GetReplyTo(MessageViewModel message, Action<BaseObject> handler)
+        public void GetReplyTo(MessageViewModel message, Action<Object> handler)
         {
             if (message.ReplyTo is MessageReplyToMessage replyToMessage ||
                 message.Content is MessagePinMessage ||
                 message.Content is MessageGameScore ||
-                message.Content is MessagePaymentSuccessful)
+                message.Content is MessagePaymentSuccessful ||
+                message.Content is MessageChecklistTasksAdded ||
+                message.Content is MessageChecklistTasksDone ||
+                message.Content is MessageSuggestedPostPaid ||
+                message.Content is MessageSuggestedPostRefunded)
             {
                 Send(new GetRepliedMessage(message.ChatId, message.Id), handler);
             }
@@ -925,7 +936,7 @@ namespace Telegram.Services
             }
         }
 
-        public void GetStory(long storyPosterChatId, int storyId, Action<BaseObject> handler)
+        public void GetStory(long storyPosterChatId, int storyId, Action<Object> handler)
         {
             Send(new GetStory(storyPosterChatId, storyId, true), result =>
             {
@@ -944,7 +955,7 @@ namespace Telegram.Services
 
         private readonly Dictionary<long, DateTime> _chatAccessibleUntil = new();
 
-        public async Task<BaseObject> CheckChatInviteLinkAsync(string inviteLink)
+        public async Task<Object> CheckChatInviteLinkAsync(string inviteLink)
         {
             var response = await SendAsync(new CheckChatInviteLink(inviteLink));
             if (response is ChatInviteLinkInfo info)
@@ -964,12 +975,12 @@ namespace Telegram.Services
 
 
 
-        public void DownloadFile(int fileId, int priority, int offset = 0, int limit = 0, bool synchronous = false)
+        public void DownloadFile(int fileId, int priority, long offset = 0, long limit = 0, bool synchronous = false)
         {
             Send(new DownloadFile(fileId, priority, offset, limit, synchronous));
         }
 
-        public async Task<File> DownloadFileAsync(File file, int priority, int offset = 0, int limit = 0)
+        public async Task<File> DownloadFileAsync(File file, int priority, long offset = 0, long limit = 0)
         {
             var response = await SendAsync(new DownloadFile(file.Id, priority, offset, limit, true));
             if (response is File updated)
@@ -981,7 +992,7 @@ namespace Telegram.Services
         }
 
 
-        public async Task<BaseObject> GetStarTransactionsAsync(MessageSender ownerId, string subscriptionId, StarTransactionDirection direction, string offset, int limit)
+        public async Task<Object> GetStarTransactionsAsync(MessageSender ownerId, string subscriptionId, TransactionDirection direction, string offset, int limit)
         {
             var response = await SendAsync(new GetStarTransactions(ownerId, subscriptionId, direction, offset, limit));
             if (response is StarTransactions transactions)
@@ -1301,6 +1312,22 @@ namespace Telegram.Services
             return new ChatMemberStatusMember();
         }
 
+        public void LoadFullInfo(Chat chat)
+        {
+            if (TryGetUser(chat, out User user))
+            {
+                Send(new GetUserFullInfo(user.Id));
+            }
+            else if (TryGetSupergroup(chat, out Supergroup supergroup))
+            {
+                Send(new GetSupergroupFullInfo(supergroup.Id));
+            }
+            else if (TryGetBasicGroup(chat, out BasicGroup basicGroup))
+            {
+                Send(new GetBasicGroupFullInfo(basicGroup.Id));
+            }
+        }
+
         public string GetTitle(long chatId, bool tiny = false)
         {
             if (_chats.TryGetValue(chatId, out var chat))
@@ -1372,11 +1399,11 @@ namespace Telegram.Services
             return null;
         }
 
-        public string GetTitle(MessageSender sender)
+        public string GetTitle(MessageSender sender, bool firstName = false)
         {
             if (TryGetUser(sender, out User user))
             {
-                return user.FullName();
+                return user.FullName(firstName);
             }
             else if (TryGetChat(sender, out Chat chat))
             {
@@ -1608,11 +1635,11 @@ namespace Telegram.Services
             return false;
         }
 
-        public bool IsFeedbackGroup(Chat chat)
+        public bool IsDirectMessagesGroup(Chat chat)
         {
             if (TryGetSupergroup(chat, out Supergroup supergroup))
             {
-                return supergroup.IsFeedbackGroup;
+                return supergroup.IsDirectMessagesGroup;
             }
 
             return false;
@@ -1622,7 +1649,7 @@ namespace Telegram.Services
         {
             if (TryGetSupergroup(chat, out Supergroup supergroup))
             {
-                return supergroup.HasForumTabs || supergroup.IsFeedbackGroup;
+                return supergroup.HasForumTabs || supergroup.IsDirectMessagesGroup;
             }
 
             return false;
@@ -1720,7 +1747,23 @@ namespace Telegram.Services
             return true;
         }
 
-        public BaseObject GetMessageSender(MessageSender sender)
+        public bool CanPromoteMembers(Chat chat)
+        {
+            if (TryGetSupergroup(chat, out Supergroup supergroup))
+            {
+                return supergroup.CanPromoteMembers();
+            }
+            else if (TryGetBasicGroup(chat, out BasicGroup basicGroup))
+            {
+                return basicGroup.CanPromoteMembers();
+            }
+
+            // TODO: secret chats maybe?
+
+            return true;
+        }
+
+        public Object GetMessageSender(MessageSender sender)
         {
             if (sender is MessageSenderUser user)
             {
@@ -1732,6 +1775,23 @@ namespace Telegram.Services
             }
 
             return null;
+        }
+
+        public bool TryGetMessageSender(MessageSender sender, out Object value)
+        {
+            if (sender is MessageSenderUser user && TryGetUser(user.UserId, out User resultUser))
+            {
+                value = resultUser;
+                return true;
+            }
+            else if (sender is MessageSenderChat chat && TryGetChat(chat.ChatId, out Chat resultChat))
+            {
+                value = resultChat;
+                return true;
+            }
+
+            value = null;
+            return false;
         }
 
         public bool TryGetChat(long chatId, out Chat chat)
@@ -1755,6 +1815,17 @@ namespace Telegram.Services
             if (type is AffiliateTypeChannel typeChannel)
             {
                 return TryGetChat(typeChannel.ChatId, out value);
+            }
+
+            value = null;
+            return false;
+        }
+
+        public bool TryGetChat(SavedMessagesTopicType type, out Chat value)
+        {
+            if (type is SavedMessagesTopicTypeSavedFromChat fromChat)
+            {
+                return TryGetChat(fromChat.ChatId, out value);
             }
 
             value = null;
@@ -2390,9 +2461,77 @@ namespace Telegram.Services
 
         #endregion
 
+        public bool TryGetMediaAlbum(long chatId, long mediaAlbumId, out MessageAlbumLastMessage album)
+        {
+            if (_lastMessageAlbums.TryGetValue(chatId, out MessageAlbumLastMessageService service))
+            {
+                if (service.MediaAlbumId == mediaAlbumId && service.LastMessage != null)
+                {
+                    album = service.Info();
+                    return true;
+                }
+            }
 
+            album = null;
+            return false;
+        }
 
+        private void UpdateChatLastMessage(Chat chat, Message lastMessage)
+        {
+            chat.LastMessage = lastMessage;
+
+            if (lastMessage == null || lastMessage.MediaAlbumId == 0 || lastMessage.Content is not MessagePhoto and not MessageVideo || !SettingsService.Current.Diagnostics.AlbumPreloadDebug)
+            {
+                _lastMessageAlbums.TryRemove(chat.Id, out _);
+                return;
+            }
+
+            if (_lastMessageAlbums.TryGetValue(chat.Id, out MessageAlbumLastMessageService service))
+            {
+                if (service.MediaAlbumId == lastMessage.MediaAlbumId)
+                {
+                    service.LoadMore(lastMessage.Id);
+                    return;
+                }
+            }
+
+            _lastMessageAlbums[chat.Id] = new MessageAlbumLastMessageService(this, _aggregator, chat, lastMessage);
+        }
+
+        private void UpdateChatLastMessage(UpdateDeleteMessages update)
+        {
+            if (update.FromCache)
+            {
+                return;
+            }
+
+            if (_lastMessageAlbums.TryGetValue(update.ChatId, out MessageAlbumLastMessageService service))
+            {
+                service.DeleteMessages(update.MessageIds);
+            }
+        }
+
+        private void UpdateChatLastMessage(UpdateMessageSendSucceeded update)
+        {
+            if (_lastMessageAlbums.TryGetValue(update.Message.ChatId, out MessageAlbumLastMessageService service))
+            {
+                service.MessageSendSucceeded(update.OldMessageId, update.Message);
+            }
+        }
+
+        private void UpdateChatLastMessage(UpdateMessageSendFailed update)
+        {
+            if (_lastMessageAlbums.TryGetValue(update.Message.ChatId, out MessageAlbumLastMessageService service))
+            {
+                service.MessageSendFailed(update.OldMessageId, update.Message);
+            }
+        }
+
+#if TD_CX
         public void OnResult(BaseObject update)
+#else
+        public void OnResult(Object update)
+#endif
         {
             ProcessFiles(update);
 
@@ -2404,10 +2543,10 @@ namespace Telegram.Services
                         var token = SessionId << 16 | updateFile.File.Id;
                         if (updateFile.File.Local.IsDownloadingCompleted)
                         {
-                            EventAggregator.Current.Publish(updateFile.File, token | 0x01000000, true);
+                            EventAggregator.Current.Publish(updateFile.File, token | 0x01000000);
                         }
 
-                        EventAggregator.Current.Publish(updateFile.File, token, false);
+                        EventAggregator.Current.Publish(updateFile.File, token);
                         TrackDownloadedFile(updateFile.File);
                         return;
                     }
@@ -2455,13 +2594,13 @@ namespace Telegram.Services
                         {
                             Monitor.Enter(value);
 
-                            value.LastMessage = updateChatLastMessage.LastMessage;
+                            UpdateChatLastMessage(value, updateChatLastMessage.LastMessage);
                             SetChatPositions(value, updateChatLastMessage.Positions);
 
                             Monitor.Exit(value);
                         }
 
-                        UpdateForumTopic(updateChatLastMessage.ChatId, manager => manager.UpdateChatLastMessage(updateChatLastMessage.LastMessage));
+                        UpdateForumTopic(updateChatLastMessage.ChatId, false, manager => manager.UpdateChatLastMessage(updateChatLastMessage.LastMessage));
                         break;
                     }
 
@@ -2486,7 +2625,10 @@ namespace Telegram.Services
                         _chats[updateNewChat.Chat.Id] = updateNewChat.Chat;
 
                         Monitor.Enter(updateNewChat.Chat);
+
+                        UpdateChatLastMessage(updateNewChat.Chat, updateNewChat.Chat.LastMessage);
                         SetChatPositions(updateNewChat.Chat, updateNewChat.Chat.Positions);
+
                         Monitor.Exit(updateNewChat.Chat);
 
                         if (updateNewChat.Chat.Type is ChatTypePrivate privata)
@@ -2942,13 +3084,13 @@ namespace Telegram.Services
                     _favoriteStickers = updateFavoriteStickers.StickerIds;
                     break;
                 case UpdateForumTopic updateForumTopic:
-                    UpdateForumTopic(updateForumTopic.ChatId, manager => manager.UpdateForumTopic(updateForumTopic));
+                    UpdateForumTopic(updateForumTopic.ChatId, true, manager => manager.UpdateForumTopic(updateForumTopic));
                     break;
                 case UpdateForumTopicInfo updateForumTopicInfo:
-                    UpdateForumTopic(updateForumTopicInfo.Info.ChatId, manager => manager.UpdateForumTopicInfo(updateForumTopicInfo.Info));
+                    UpdateForumTopic(updateForumTopicInfo.Info.ChatId, true, manager => manager.UpdateForumTopicInfo(updateForumTopicInfo.Info));
                     break;
-                case UpdateFeedbackChatTopic updateFeedbackChatTopic:
-                    UpdateFeedbackChatTopic(updateFeedbackChatTopic.Topic.ChatId, manager => manager.UpdateFeedbackChatTopic(updateFeedbackChatTopic.Topic));
+                case UpdateDirectMessagesChatTopic updateDirectMessagesChatTopic:
+                    UpdateDirectMessagesChatTopic(updateDirectMessagesChatTopic.Topic.ChatId, manager => manager.UpdateDirectMessagesChatTopic(updateDirectMessagesChatTopic.Topic));
                     break;
                 case UpdateInstalledStickerSets updateInstalledStickerSets:
                     switch (updateInstalledStickerSets.StickerType)
@@ -2969,7 +3111,7 @@ namespace Telegram.Services
                     break;
                 case UpdateMessageIsPinned updateMessageIsPinned:
                     _settings.SetChatPinnedMessage(updateMessageIsPinned.ChatId, 0);
-                    UpdateForumTopic(updateMessageIsPinned.ChatId, manager => manager.UpdateMessageIsPinned(updateMessageIsPinned.MessageId, updateMessageIsPinned.IsPinned));
+                    UpdateForumTopic(updateMessageIsPinned.ChatId, false, manager => manager.UpdateMessageIsPinned(updateMessageIsPinned.MessageId, updateMessageIsPinned.IsPinned));
                     break;
                 case UpdateMessageMentionRead updateMessageMentionRead:
                     {
@@ -2978,7 +3120,7 @@ namespace Telegram.Services
                             value.UnreadMentionCount = updateMessageMentionRead.UnreadMentionCount;
                         }
 
-                        UpdateForumTopic(updateMessageMentionRead.ChatId, manager => manager.UpdateMessageMentionRead(updateMessageMentionRead.MessageId, updateMessageMentionRead.UnreadMentionCount));
+                        UpdateForumTopic(updateMessageMentionRead.ChatId, false, manager => manager.UpdateMessageMentionRead(updateMessageMentionRead.MessageId, updateMessageMentionRead.UnreadMentionCount));
                         break;
                     }
 
@@ -2989,7 +3131,7 @@ namespace Telegram.Services
                             value.UnreadReactionCount = updateMessageUnreadReactions.UnreadReactionCount;
                         }
 
-                        UpdateForumTopic(updateMessageUnreadReactions.ChatId, manager => manager.UpdateMessageUnreadReactions(updateMessageUnreadReactions.MessageId, updateMessageUnreadReactions.UnreadReactions, updateMessageUnreadReactions.UnreadReactionCount));
+                        UpdateForumTopic(updateMessageUnreadReactions.ChatId, false, manager => manager.UpdateMessageUnreadReactions(updateMessageUnreadReactions.MessageId, updateMessageUnreadReactions.UnreadReactions, updateMessageUnreadReactions.UnreadReactionCount));
                         break;
                     }
 
@@ -3215,32 +3357,38 @@ namespace Telegram.Services
                 case UpdateFreezeState updateFreezeState:
                     _freezeState = updateFreezeState;
                     break;
+                case UpdateSavedMessagesTopicCount updateSavedMessagesTopicCount:
+                    SavedMessagesTopicCount = updateSavedMessagesTopicCount.TopicCount;
+                    break;
                 case UpdateNewMessage updateNewMessage:
-                    UpdateForumTopic(updateNewMessage.Message.ChatId, manager => manager.UpdateNewMessage(updateNewMessage.Message));
+                    UpdateForumTopic(updateNewMessage.Message.ChatId, false, manager => manager.UpdateNewMessage(updateNewMessage.Message));
                     break;
                 case UpdateDeleteMessages updateDeleteMessages:
-                    UpdateForumTopic(updateDeleteMessages.ChatId, manager => manager.UpdateDeleteMessages(updateDeleteMessages.MessageIds, updateDeleteMessages.IsPermanent, updateDeleteMessages.FromCache));
+                    UpdateChatLastMessage(updateDeleteMessages);
+                    UpdateForumTopic(updateDeleteMessages.ChatId, false, manager => manager.UpdateDeleteMessages(updateDeleteMessages.MessageIds, updateDeleteMessages.IsPermanent, updateDeleteMessages.FromCache));
                     break;
                 case UpdateMessageSendSucceeded updateMessageSendSucceeded:
-                    UpdateForumTopic(updateMessageSendSucceeded.Message.ChatId, manager => manager.UpdateMessageSendSucceeded(updateMessageSendSucceeded.Message, updateMessageSendSucceeded.OldMessageId));
+                    UpdateChatLastMessage(updateMessageSendSucceeded);
+                    UpdateForumTopic(updateMessageSendSucceeded.Message.ChatId, false, manager => manager.UpdateMessageSendSucceeded(updateMessageSendSucceeded.Message, updateMessageSendSucceeded.OldMessageId));
                     break;
                 case UpdateMessageSendFailed updateMessageSendFailed:
-                    UpdateForumTopic(updateMessageSendFailed.Message.ChatId, manager => manager.UpdateMessageSendFailed(updateMessageSendFailed.Message, updateMessageSendFailed.OldMessageId, updateMessageSendFailed.Error));
+                    UpdateChatLastMessage(updateMessageSendFailed);
+                    UpdateForumTopic(updateMessageSendFailed.Message.ChatId, false, manager => manager.UpdateMessageSendFailed(updateMessageSendFailed.Message, updateMessageSendFailed.OldMessageId, updateMessageSendFailed.Error));
                     break;
                 case UpdateMessageContent updateMessageContent:
-                    UpdateForumTopic(updateMessageContent.ChatId, manager => manager.UpdateMessageContent(updateMessageContent.MessageId, updateMessageContent.NewContent));
+                    UpdateForumTopic(updateMessageContent.ChatId, false, manager => manager.UpdateMessageContent(updateMessageContent.MessageId, updateMessageContent.NewContent));
                     break;
                 case UpdateMessageEdited updateMessageEdited:
-                    UpdateForumTopic(updateMessageEdited.ChatId, manager => manager.UpdateMessageEdited(updateMessageEdited.MessageId, updateMessageEdited.EditDate, updateMessageEdited.ReplyMarkup));
+                    UpdateForumTopic(updateMessageEdited.ChatId, false, manager => manager.UpdateMessageEdited(updateMessageEdited.MessageId, updateMessageEdited.EditDate, updateMessageEdited.ReplyMarkup));
                     break;
                 case UpdateMessageInteractionInfo updateMessageInteractionInfo:
-                    UpdateForumTopic(updateMessageInteractionInfo.ChatId, manager => manager.UpdateMessageInteractionInfo(updateMessageInteractionInfo.MessageId, updateMessageInteractionInfo.InteractionInfo));
+                    UpdateForumTopic(updateMessageInteractionInfo.ChatId, false, manager => manager.UpdateMessageInteractionInfo(updateMessageInteractionInfo.MessageId, updateMessageInteractionInfo.InteractionInfo));
                     break;
                 case UpdateMessageContentOpened updateMessageContentOpened:
-                    UpdateForumTopic(updateMessageContentOpened.ChatId, manager => manager.UpdateMessageContentOpened(updateMessageContentOpened.MessageId));
+                    UpdateForumTopic(updateMessageContentOpened.ChatId, false, manager => manager.UpdateMessageContentOpened(updateMessageContentOpened.MessageId));
                     break;
                 case UpdateMessageFactCheck updateMessageFactCheck:
-                    UpdateForumTopic(updateMessageFactCheck.ChatId, manager => manager.UpdateMessageFactCheck(updateMessageFactCheck.MessageId, updateMessageFactCheck.FactCheck));
+                    UpdateForumTopic(updateMessageFactCheck.ChatId, false, manager => manager.UpdateMessageFactCheck(updateMessageFactCheck.MessageId, updateMessageFactCheck.FactCheck));
                     break;
             }
 
@@ -3291,7 +3439,7 @@ namespace Telegram.Services
 
 namespace Telegram.Td.Api
 {
-    public sealed class Topics
+    public sealed partial class Topics
     {
         public Topics(int totalCount, IList<long> topics)
         {

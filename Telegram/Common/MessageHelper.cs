@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Telegram.Controls;
+using Telegram.Controls.Cells;
 using Telegram.Controls.Media;
 using Telegram.Controls.Stories;
 using Telegram.Native;
@@ -42,8 +43,6 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Input;
-using Point = Windows.Foundation.Point;
-using User = Telegram.Td.Api.User;
 
 namespace Telegram.Common
 {
@@ -426,7 +425,7 @@ namespace Telegram.Common
             }
         }
 
-        private static async void OpenLoginUrl(IClientService clientService, INavigationService navigation, string url, BaseObject info)
+        private static async void OpenLoginUrl(IClientService clientService, INavigationService navigation, string url, Object info)
         {
             if (info is LoginUrlInfoOpen infoOpen)
             {
@@ -456,181 +455,150 @@ namespace Telegram.Common
 
         public static void OpenTelegramUrl(IClientService clientService, INavigationService navigation, InternalLinkType internalLink, OpenUrlSource source = null)
         {
-            if (internalLink is InternalLinkTypeActiveSessions)
+            switch (internalLink)
             {
-                navigation.Navigate(typeof(SettingsSessionsPage));
+                case InternalLinkTypeActiveSessions:
+                    navigation.Navigate(typeof(SettingsSessionsPage));
+                    break;
+                case InternalLinkTypeAuthenticationCode authenticationCode:
+                    if (clientService.AuthorizationState is AuthorizationStateWaitCode)
+                    {
+                        clientService.Send(new CheckAuthenticationCode(authenticationCode.Code));
+                    }
+                    break;
+                case InternalLinkTypeAttachmentMenuBot attachmentMenuBot:
+                    NavigateToAttachmentMenuBot(clientService, navigation, attachmentMenuBot, source);
+                    break;
+                case InternalLinkTypeBackground background:
+                    NavigateToBackground(clientService, navigation, background.BackgroundName);
+                    break;
+                case InternalLinkTypeBotStart botStart:
+                    NavigateToBotStart(clientService, navigation, botStart.BotUsername, botStart.StartParameter, botStart.Autostart, false);
+                    break;
+                case InternalLinkTypeBotStartInGroup botStartInGroup:
+                    // Not yet supported: AdministratorRights
+                    NavigateToBotStart(clientService, navigation, botStartInGroup.BotUsername, botStartInGroup.StartParameter, false, true);
+                    break;
+                case InternalLinkTypeBusinessChat businessChat:
+                    NavigateToBusinessChat(clientService, navigation, businessChat.LinkName);
+                    break;
+                case InternalLinkTypeChangePhoneNumber:
+                    navigation.Navigate(typeof(SettingsProfilePage));
+                    break;
+                case InternalLinkTypeLanguageSettings:
+                    navigation.Navigate(typeof(SettingsLanguagePage));
+                    break;
+                case InternalLinkTypeChatBoost chatBoost:
+                    NavigateToChatBoost(clientService, navigation, chatBoost.Url);
+                    break;
+                case InternalLinkTypeChatInvite chatInvite:
+                    NavigateToInviteLink(clientService, navigation, chatInvite.InviteLink);
+                    break;
+                case InternalLinkTypeChatFolderInvite chatFolderInvite:
+                    NavigateToChatFolderInviteLink(clientService, navigation, chatFolderInvite.InviteLink);
+                    break;
+                case InternalLinkTypeChatFolderSettings:
+                    navigation.Navigate(typeof(FoldersPage));
+                    break;
+                case InternalLinkTypeGame game:
+                    NavigateToUsername(clientService, navigation, game.BotUsername, null, game.GameShortName);
+                    break;
+                case InternalLinkTypeInstantView instantView:
+                    navigation.NavigateToInstant(instantView.Url, instantView.FallbackUrl);
+                    break;
+                case InternalLinkTypeInvoice invoice:
+                    NavigateToInvoice(navigation, invoice.InvoiceName);
+                    break;
+                case InternalLinkTypeLanguagePack languagePack:
+                    NavigateToLanguage(clientService, navigation, languagePack.LanguagePackId);
+                    break;
+                case InternalLinkTypeMessage message:
+                    NavigateToMessage(clientService, navigation, message.Url);
+                    break;
+                case InternalLinkTypeMessageDraft messageDraft:
+                    NavigateToShare(navigation, messageDraft.Text, messageDraft.ContainsLink);
+                    break;
+                case InternalLinkTypePassportDataRequest:
+                    break;
+                case InternalLinkTypePremiumFeatures premiumFeatures:
+                    navigation.ShowPromo(new PremiumSourceLink(premiumFeatures.Referrer));
+                    break;
+                case InternalLinkTypePremiumGiftCode premiumGiftCode:
+                    NavigateToPremiumGiftCode(clientService, navigation, premiumGiftCode.Code, source);
+                    break;
+                case InternalLinkTypePrivacyAndSecuritySettings:
+                    navigation.Navigate(typeof(SettingsPrivacyAndSecurityPage));
+                    break;
+                case InternalLinkTypePhoneNumberConfirmation phoneNumberConfirmation:
+                    NavigateToConfirmPhone(clientService, phoneNumberConfirmation.PhoneNumber, phoneNumberConfirmation.Hash);
+                    break;
+                case InternalLinkTypeProxy proxy:
+                    NavigateToProxy(clientService, navigation, proxy.Server, proxy.Port, proxy.Type);
+                    break;
+                case InternalLinkTypeUnsupportedProxy:
+                    navigation.ShowToast(Strings.ProxyLinkUnsupported, ToastPopupIcon.Error);
+                    break;
+                case InternalLinkTypePublicChat publicChat:
+                    NavigateToUsername(clientService, navigation, publicChat.ChatUsername, draftText: publicChat.DraftText, openProfile: publicChat.OpenProfile);
+                    break;
+                case InternalLinkTypeQrCodeAuthentication:
+                    break;
+                case InternalLinkTypeSettings:
+                    break;
+                case InternalLinkTypeStickerSet stickerSet:
+                    NavigateToStickerSet(navigation, stickerSet.StickerSetName);
+                    break;
+                case InternalLinkTypeStory story:
+                    NavigateToStory(clientService, navigation, story.StoryPosterUsername, story.StoryId);
+                    break;
+                case InternalLinkTypeTheme theme:
+                    NavigateToTheme(clientService, navigation, theme.ThemeName);
+                    break;
+                case InternalLinkTypeThemeSettings:
+                    navigation.Navigate(typeof(SettingsAppearancePage));
+                    break;
+                case InternalLinkTypeUnknownDeepLink unknownDeepLink:
+                    NavigateToUnknownDeepLink(clientService, navigation, unknownDeepLink.Link);
+                    break;
+                case InternalLinkTypeUserPhoneNumber phoneNumber:
+                    NavigateToPhoneNumber(clientService, navigation, phoneNumber.PhoneNumber, phoneNumber.DraftText, phoneNumber.OpenProfile);
+                    break;
+                case InternalLinkTypeUserToken userToken:
+                    NavigateToUserToken(clientService, navigation, userToken.Token);
+                    break;
+                case InternalLinkTypeVideoChat videoChat:
+                    NavigateToUsername(clientService, navigation, videoChat.ChatUsername, videoChat.InviteHash, null);
+                    break;
+                case InternalLinkTypeWebApp webApp:
+                    NavigateToWebApp(clientService, navigation, webApp.BotUsername, webApp.StartParameter, webApp.WebAppShortName, webApp.Mode, source);
+                    break;
+                case InternalLinkTypeMainWebApp mainWebApp:
+                    NavigateToMainWebApp(clientService, navigation, mainWebApp.BotUsername, mainWebApp.StartParameter, mainWebApp.Mode, source);
+                    break;
+                case InternalLinkTypeChatAffiliateProgram chatAffiliateProgram:
+                    NavigateToUsername(clientService, navigation, chatAffiliateProgram.Username, referrer: chatAffiliateProgram.Referrer);
+                    break;
+                case InternalLinkTypeUpgradedGift upgradedGift:
+                    NavigateToUpgradedGift(clientService, navigation, upgradedGift.Name);
+                    break;
+                case InternalLinkTypeGroupCall groupCall:
+                    NavigateToGroupCall(clientService, navigation, new InputGroupCallLink(groupCall.InviteLink));
+                    break;
+                case InternalLinkTypeMyStars:
+                    navigation.Navigate(typeof(StarsPage));
+                    break;
+                case InternalLinkTypeBotAddToChannel botAddToChannel:
+                    NavigateToBotAddToChannel(clientService, navigation, botAddToChannel.BotUsername, botAddToChannel.AdministratorRights);
+                    break;
             }
-            else if (internalLink is InternalLinkTypeAuthenticationCode authenticationCode)
-            {
-                if (clientService.AuthorizationState is AuthorizationStateWaitCode)
-                {
-                    clientService.Send(new CheckAuthenticationCode(authenticationCode.Code));
-                }
-            }
-            else if (internalLink is InternalLinkTypeAttachmentMenuBot attachmentMenuBot)
-            {
-                NavigateToAttachmentMenuBot(clientService, navigation, attachmentMenuBot, source);
-            }
-            else if (internalLink is InternalLinkTypeBackground background)
-            {
-                NavigateToBackground(clientService, navigation, background.BackgroundName);
-            }
-            else if (internalLink is InternalLinkTypeBotStart botStart)
-            {
-                NavigateToBotStart(clientService, navigation, botStart.BotUsername, botStart.StartParameter, botStart.Autostart, false);
-            }
-            else if (internalLink is InternalLinkTypeBotStartInGroup botStartInGroup)
-            {
-                // Not yet supported: AdministratorRights
-                NavigateToBotStart(clientService, navigation, botStartInGroup.BotUsername, botStartInGroup.StartParameter, false, true);
-            }
-            else if (internalLink is InternalLinkTypeBusinessChat businessChat)
-            {
-                NavigateToBusinessChat(clientService, navigation, businessChat.LinkName);
-            }
-            else if (internalLink is InternalLinkTypeChangePhoneNumber)
-            {
-                navigation.Navigate(typeof(SettingsProfilePage));
-            }
-            else if (internalLink is InternalLinkTypeLanguageSettings)
-            {
-                navigation.Navigate(typeof(SettingsLanguagePage));
-            }
-            else if (internalLink is InternalLinkTypeChatBoost chatBoost)
-            {
-                NavigateToChatBoost(clientService, navigation, chatBoost.Url);
-            }
-            else if (internalLink is InternalLinkTypeChatInvite chatInvite)
-            {
-                NavigateToInviteLink(clientService, navigation, chatInvite.InviteLink);
-            }
-            else if (internalLink is InternalLinkTypeChatFolderInvite chatFolderInvite)
-            {
-                NavigateToChatFolderInviteLink(clientService, navigation, chatFolderInvite.InviteLink);
-            }
-            else if (internalLink is InternalLinkTypeChatFolderSettings)
-            {
-                navigation.Navigate(typeof(FoldersPage));
-            }
-            else if (internalLink is InternalLinkTypeGame game)
-            {
-                NavigateToUsername(clientService, navigation, game.BotUsername, null, game.GameShortName);
-            }
-            else if (internalLink is InternalLinkTypeInstantView instantView)
-            {
-                navigation.NavigateToInstant(instantView.Url, instantView.FallbackUrl);
-            }
-            else if (internalLink is InternalLinkTypeInvoice invoice)
-            {
-                NavigateToInvoice(navigation, invoice.InvoiceName);
-            }
-            else if (internalLink is InternalLinkTypeLanguagePack languagePack)
-            {
-                NavigateToLanguage(clientService, navigation, languagePack.LanguagePackId);
-            }
-            else if (internalLink is InternalLinkTypeMessage message)
-            {
-                NavigateToMessage(clientService, navigation, message.Url);
-            }
-            else if (internalLink is InternalLinkTypeMessageDraft messageDraft)
-            {
-                NavigateToShare(navigation, messageDraft.Text, messageDraft.ContainsLink);
-            }
-            else if (internalLink is InternalLinkTypePassportDataRequest)
-            {
+        }
 
-            }
-            else if (internalLink is InternalLinkTypePremiumFeatures premiumFeatures)
+        private static async void NavigateToBotAddToChannel(IClientService clientService, INavigationService navigation, string botUsername, ChatAdministratorRights administratorRights)
+        {
+            var response = await clientService.SendAsync(new SearchPublicChat(botUsername));
+            if (response is Chat chat && clientService.TryGetUser(chat, out User botUser))
             {
-                navigation.ShowPromo(new PremiumSourceLink(premiumFeatures.Referrer));
-            }
-            else if (internalLink is InternalLinkTypePremiumGiftCode premiumGiftCode)
-            {
-                NavigateToPremiumGiftCode(clientService, navigation, premiumGiftCode.Code, source);
-            }
-            else if (internalLink is InternalLinkTypePrivacyAndSecuritySettings)
-            {
-                navigation.Navigate(typeof(SettingsPrivacyAndSecurityPage));
-            }
-            else if (internalLink is InternalLinkTypePhoneNumberConfirmation phoneNumberConfirmation)
-            {
-                NavigateToConfirmPhone(clientService, phoneNumberConfirmation.PhoneNumber, phoneNumberConfirmation.Hash);
-            }
-            else if (internalLink is InternalLinkTypeProxy proxy)
-            {
-                NavigateToProxy(clientService, navigation, proxy.Server, proxy.Port, proxy.Type);
-            }
-            else if (internalLink is InternalLinkTypeUnsupportedProxy)
-            {
-                navigation.ShowToast(Strings.ProxyLinkUnsupported, ToastPopupIcon.Error);
-            }
-            else if (internalLink is InternalLinkTypePublicChat publicChat)
-            {
-                NavigateToUsername(clientService, navigation, publicChat.ChatUsername, draftText: publicChat.DraftText, openProfile: publicChat.OpenProfile);
-            }
-            else if (internalLink is InternalLinkTypeQrCodeAuthentication)
-            {
-
-            }
-            else if (internalLink is InternalLinkTypeSettings)
-            {
-
-            }
-            else if (internalLink is InternalLinkTypeStickerSet stickerSet)
-            {
-                NavigateToStickerSet(navigation, stickerSet.StickerSetName);
-            }
-            else if (internalLink is InternalLinkTypeStory story)
-            {
-                NavigateToStory(clientService, navigation, story.StoryPosterUsername, story.StoryId);
-            }
-            else if (internalLink is InternalLinkTypeTheme theme)
-            {
-                NavigateToTheme(clientService, navigation, theme.ThemeName);
-            }
-            else if (internalLink is InternalLinkTypeThemeSettings)
-            {
-                navigation.Navigate(typeof(SettingsAppearancePage));
-            }
-            else if (internalLink is InternalLinkTypeUnknownDeepLink unknownDeepLink)
-            {
-                NavigateToUnknownDeepLink(clientService, navigation, unknownDeepLink.Link);
-            }
-            else if (internalLink is InternalLinkTypeUserPhoneNumber phoneNumber)
-            {
-                NavigateToPhoneNumber(clientService, navigation, phoneNumber.PhoneNumber, phoneNumber.DraftText, phoneNumber.OpenProfile);
-            }
-            else if (internalLink is InternalLinkTypeUserToken userToken)
-            {
-                NavigateToUserToken(clientService, navigation, userToken.Token);
-            }
-            else if (internalLink is InternalLinkTypeVideoChat videoChat)
-            {
-                NavigateToUsername(clientService, navigation, videoChat.ChatUsername, videoChat.InviteHash, null);
-            }
-            else if (internalLink is InternalLinkTypeWebApp webApp)
-            {
-                NavigateToWebApp(clientService, navigation, webApp.BotUsername, webApp.StartParameter, webApp.WebAppShortName, webApp.Mode, source);
-            }
-            else if (internalLink is InternalLinkTypeMainWebApp mainWebApp)
-            {
-                NavigateToMainWebApp(clientService, navigation, mainWebApp.BotUsername, mainWebApp.StartParameter, mainWebApp.Mode, source);
-            }
-            else if (internalLink is InternalLinkTypeChatAffiliateProgram chatAffiliateProgram)
-            {
-                NavigateToUsername(clientService, navigation, chatAffiliateProgram.Username, referrer: chatAffiliateProgram.Referrer);
-            }
-            else if (internalLink is InternalLinkTypeUpgradedGift upgradedGift)
-            {
-                NavigateToUpgradedGift(clientService, navigation, upgradedGift.Name);
-            }
-            else if (internalLink is InternalLinkTypeGroupCall groupCall)
-            {
-                NavigateToGroupCall(clientService, navigation, new InputGroupCallLink(groupCall.InviteLink));
-            }
-            else if (internalLink is InternalLinkTypeMyStars)
-            {
-                navigation.Navigate(typeof(StarsPage));
+                navigation.ShowPopup(new ChooseChatsPopup(), new ChooseChatsConfigurationBotAddToChannel(botUser.Id, administratorRights));
             }
         }
 
@@ -972,7 +940,7 @@ namespace Telegram.Common
             var response = await clientService.SendAsync(new SearchBackground(slug));
             if (response is Background background)
             {
-                await navigation.ShowPopupAsync(new BackgroundPopup(), new BackgroundParameters(background));
+                navigation.ShowPopup(new BackgroundPopup(), new BackgroundParameters(background));
             }
         }
 
@@ -985,7 +953,45 @@ namespace Telegram.Common
                 {
                     if (info.MessageThreadId != 0)
                     {
-                        navigation.NavigateToChat(chat, info.Message.Id, topic: new MessageTopicForum(info.MessageThreadId));
+                        long messageThreadId;
+                        MessageTopic messageTopic;
+
+                        if (info.Message.TopicId is MessageTopicForum forumTopic && clientService.IsForum(chat))
+                        {
+                            messageThreadId = forumTopic.ForumTopicId;
+                            messageTopic = forumTopic;
+                        }
+                        else
+                        {
+                            var properties = await clientService.SendAsync(new GetMessageProperties(info.Message.ChatId, info.Message.Id)) as MessageProperties;
+                            if (properties != null && properties.CanGetMessageThread)
+                            {
+                                messageThreadId = info.Message.Id;
+                                messageTopic = new MessageTopicForum(info.MessageThreadId);
+                            }
+                            else
+                            {
+                                messageThreadId = 0;
+                                messageTopic = null;
+                            }
+                        }
+
+                        if (messageTopic != null)
+                        {
+                            var thread = await clientService.SendAsync(new GetMessageThread(info.ChatId, messageThreadId));
+                            if (thread is MessageThreadInfo)
+                            {
+                                navigation.NavigateToChat(chat, info.Message.Id, topic: messageTopic);
+                            }
+                            else
+                            {
+                                navigation.ShowPopup(Strings.LinkNotFound, Strings.AppName, Strings.OK);
+                            }
+                        }
+                        else
+                        {
+                            navigation.NavigateToChat(chat, info.Message.Id);
+                        }
                     }
                     else
                     {
@@ -1003,13 +1009,13 @@ namespace Telegram.Common
             }
             else
             {
-                await navigation.ShowPopupAsync(Strings.LinkNotFound, Strings.AppName, Strings.OK);
+                navigation.ShowPopup(Strings.LinkNotFound, Strings.AppName, Strings.OK);
             }
         }
 
-        private static async void NavigateToTheme(IClientService clientService, INavigationService navigation, string slug)
+        private static void NavigateToTheme(IClientService clientService, INavigationService navigation, string slug)
         {
-            await navigation.ShowPopupAsync(Strings.ThemeNotSupported, Strings.Theme, Strings.OK);
+            navigation.ShowPopup(Strings.ThemeNotSupported, Strings.Theme, Strings.OK);
         }
 
         private static void NavigateToInvoice(INavigationService navigation, string invoiceName)
@@ -1034,7 +1040,7 @@ namespace Telegram.Common
                 }
                 else if (info.TotalStringCount == 0)
                 {
-                    await navigation.ShowPopupAsync(string.Format(Strings.LanguageUnknownCustomAlert, info.Name), Strings.LanguageUnknownTitle, Strings.OK);
+                    navigation.ShowPopup(string.Format(Strings.LanguageUnknownCustomAlert, info.Name), Strings.LanguageUnknownTitle, Strings.OK);
                 }
                 else
                 {
@@ -1106,31 +1112,31 @@ namespace Telegram.Common
                 {
                     if (error.MessageEquals(ErrorType.PHONE_NUMBER_INVALID))
                     {
-                        await navigation.ShowPopupAsync(error.Message, Strings.InvalidPhoneNumber, Strings.OK);
+                        navigation.ShowPopup(error.Message, Strings.InvalidPhoneNumber, Strings.OK);
                     }
                     else if (error.MessageEquals(ErrorType.PHONE_CODE_EMPTY) || error.MessageEquals(ErrorType.PHONE_CODE_INVALID))
                     {
-                        await navigation.ShowPopupAsync(error.Message, Strings.InvalidCode, Strings.OK);
+                        navigation.ShowPopup(error.Message, Strings.InvalidCode, Strings.OK);
                     }
                     else if (error.MessageEquals(ErrorType.PHONE_CODE_EXPIRED))
                     {
-                        await navigation.ShowPopupAsync(error.Message, Strings.CodeExpired, Strings.OK);
+                        navigation.ShowPopup(error.Message, Strings.CodeExpired, Strings.OK);
                     }
                     else if (error.MessageEquals(ErrorType.FIRSTNAME_INVALID))
                     {
-                        await navigation.ShowPopupAsync(error.Message, Strings.InvalidFirstName, Strings.OK);
+                        navigation.ShowPopup(error.Message, Strings.InvalidFirstName, Strings.OK);
                     }
                     else if (error.MessageEquals(ErrorType.LASTNAME_INVALID))
                     {
-                        await navigation.ShowPopupAsync(error.Message, Strings.InvalidLastName, Strings.OK);
+                        navigation.ShowPopup(error.Message, Strings.InvalidLastName, Strings.OK);
                     }
                     else if (error.Message.StartsWith("FLOOD_WAIT"))
                     {
-                        await navigation.ShowPopupAsync(Strings.FloodWait, Strings.AppName, Strings.OK);
+                        navigation.ShowPopup(Strings.FloodWait, Strings.AppName, Strings.OK);
                     }
                     else if (error.Code != -1000)
                     {
-                        await navigation.ShowPopupAsync(error.Message, Strings.AppName, Strings.OK);
+                        navigation.ShowPopup(error.Message, Strings.AppName, Strings.OK);
                     }
 
                     Logger.Error("account.signIn error " + error);
@@ -1143,7 +1149,7 @@ namespace Telegram.Common
                     phoneCode = phoneCode.Substring(0, 3) + "-" + phoneCode.Substring(3);
                 }
 
-                await navigation.ShowPopupAsync(string.Format(Strings.OtherLoginCode, phoneCode), Strings.AppName, Strings.OK);
+                navigation.ShowPopup(string.Format(Strings.OtherLoginCode, phoneCode), Strings.AppName, Strings.OK);
             }
         }
 
@@ -1182,7 +1188,7 @@ namespace Telegram.Common
             }
         }
 
-        public static async void NavigateToConfirmPhone(IClientService clientService, string phone, string hash)
+        public static void NavigateToConfirmPhone(IClientService clientService, string phone, string hash)
         {
             //var response = await clientService.SendConfirmPhoneCodeAsync(hash, false);
             //if (response.IsSucceeded)
@@ -1268,7 +1274,7 @@ namespace Telegram.Common
             {
                 if (group)
                 {
-                    await navigation.ShowPopupAsync(new ChooseChatsPopup(), new ChooseChatsConfigurationStartBot(user, startParameter));
+                    navigation.ShowPopup(new ChooseChatsPopup(), new ChooseChatsConfigurationStartBot(user, startParameter));
                 }
                 else if (autoStart)
                 {
@@ -1375,7 +1381,7 @@ namespace Telegram.Common
                     {
                         if (error.MessageEquals(ErrorType.INVITE_REQUEST_SENT))
                         {
-                            await navigation.ShowPopupAsync(info.Type is InviteLinkChatTypeChannel ? Strings.RequestToJoinChannelSentDescription : Strings.RequestToJoinGroupSentDescription, Strings.RequestToJoinSent, Strings.OK);
+                            navigation.ShowPopup(info.Type is InviteLinkChatTypeChannel ? Strings.RequestToJoinChannelSentDescription : Strings.RequestToJoinGroupSentDescription, Strings.RequestToJoinSent, Strings.OK);
                             return;
 
                             var message = Strings.RequestToJoinSent + Environment.NewLine + (info.Type is InviteLinkChatTypeChannel ? Strings.RequestToJoinChannelSentDescription : Strings.RequestToJoinGroupSentDescription);
@@ -1387,15 +1393,15 @@ namespace Telegram.Common
                         }
                         else if (error.MessageEquals(ErrorType.FLOOD_WAIT))
                         {
-                            await navigation.ShowPopupAsync(Strings.FloodWait, Strings.AppName, Strings.OK);
+                            navigation.ShowPopup(Strings.FloodWait, Strings.AppName, Strings.OK);
                         }
                         else if (error.MessageEquals(ErrorType.USERS_TOO_MUCH))
                         {
-                            await navigation.ShowPopupAsync(Strings.JoinToGroupErrorFull, Strings.AppName, Strings.OK);
+                            navigation.ShowPopup(Strings.JoinToGroupErrorFull, Strings.AppName, Strings.OK);
                         }
                         else
                         {
-                            await navigation.ShowPopupAsync(Strings.JoinToGroupErrorNotExist, Strings.AppName, Strings.OK);
+                            navigation.ShowPopup(Strings.JoinToGroupErrorNotExist, Strings.AppName, Strings.OK);
                         }
                     }
                 }
@@ -1404,11 +1410,11 @@ namespace Telegram.Common
             {
                 if (error.MessageEquals(ErrorType.FLOOD_WAIT))
                 {
-                    await navigation.ShowPopupAsync(Strings.FloodWait, Strings.AppName, Strings.OK);
+                    navigation.ShowPopup(Strings.FloodWait, Strings.AppName, Strings.OK);
                 }
                 else
                 {
-                    await navigation.ShowPopupAsync(Strings.JoinToGroupErrorNotExist, Strings.AppName, Strings.OK);
+                    navigation.ShowPopup(Strings.JoinToGroupErrorNotExist, Strings.AppName, Strings.OK);
                 }
             }
         }
@@ -1445,7 +1451,7 @@ namespace Telegram.Common
                                 }
                                 else
                                 {
-                                    await navigation.ShowPopupAsync(Strings.FolderLinkExpiredAlert, Strings.AppName, Strings.OK);
+                                    navigation.ShowPopup(Strings.FolderLinkExpiredAlert, Strings.AppName, Strings.OK);
                                 }
                             }
                         }
@@ -1458,7 +1464,7 @@ namespace Telegram.Common
             }
             else if (response is Error error)
             {
-                await navigation.ShowPopupAsync(Strings.FolderLinkExpiredAlert, Strings.AppName, Strings.OK);
+                navigation.ShowPopup(Strings.FolderLinkExpiredAlert, Strings.AppName, Strings.OK);
             }
         }
 
@@ -1620,7 +1626,7 @@ namespace Telegram.Common
             var length = text.Length;
             if (length > 0)
             {
-                flyout.CreateFlyoutItem(() => LinkCopy_Click(xamlRoot, text), Strings.Copy, Icons.DocumentCopy);
+                flyout.CreateFlyoutItem(() => LinkCopy_Click(xamlRoot, text), Strings.Copy, Icons.Copy);
 
                 if (service != null && service.CanTranslateText(text))
                 {
@@ -1662,7 +1668,7 @@ namespace Telegram.Common
             }
         }
 
-        public static void Hyperlink_ContextRequested(MenuFlyout flyout, ITranslateService service, Hyperlink hyperlink)
+        public static async void Hyperlink_ContextRequested(MenuFlyout flyout, ITranslateService service, Hyperlink hyperlink)
         {
             var link = GetEntityData(hyperlink);
             if (link == null)
@@ -1683,11 +1689,78 @@ namespace Telegram.Common
                     flyout.CreateFlyoutItem(() => LinkOpen_Click(hyperlink.XamlRoot, link), Strings.Open, Icons.OpenIn);
                 }
 
-                flyout.CreateFlyoutItem(() => LinkCopy_Click(hyperlink.XamlRoot, link), Strings.Copy, Icons.DocumentCopy);
+                flyout.CreateFlyoutItem(() => LinkCopy_Click(hyperlink.XamlRoot, link), Strings.CopyLink, Icons.Copy);
+            }
+            else if (type is TextEntityTypePhoneNumber)
+            {
+                flyout.CreateFlyoutItem(() => TextCopy_Click(hyperlink.XamlRoot, link), Strings.CopyNumber, Icons.Copy);
+                flyout.CreateFlyoutSeparator();
+
+                var profile = new ProfileCell();
+                var button = new Button
+                {
+                    Content = profile,
+                    Style = BootStrapper.Current.Resources["ListEmptyButtonStyle"] as Style,
+                    CornerRadius = new CornerRadius(4),
+                    IsEnabled = false
+                };
+
+                var content = new MenuFlyoutContent
+                {
+                    Content = button,
+                    Height = 48,
+                    Width = 200,
+                    Padding = new Thickness(0)
+                };
+
+                void handler(object sender, RoutedEventArgs e)
+                {
+                    profile.Loaded -= handler;
+                    profile.ShowHideSkeleton(true);
+                }
+
+                profile.Loaded += handler;
+
+                flyout.Items.Add(content);
+
+                var response = await service.ClientService.SendAsync(new SearchUserByPhoneNumber(link, false));
+                if (response is User user)
+                {
+                    button.IsEnabled = true;
+                    button.Click += (s, args) =>
+                    {
+                        flyout.Hide();
+                        WindowContext.GetNavigationService(hyperlink.XamlRoot).NavigateToUser(user.Id);
+                    };
+
+                    profile.Loaded -= handler;
+                    profile.ShowHideSkeleton(false);
+                    profile.UpdateUser(service.ClientService, user, 36, true);
+                    profile.Subtitle = Strings.ViewProfile;
+                }
+                else
+                {
+                    button.Content = new TextBlock
+                    {
+                        Text = Strings.NumberNotOnTelegram,
+                        TextWrapping = TextWrapping.Wrap,
+                        Style = BootStrapper.Current.Resources["InfoCaptionTextBlockStyle"] as Style,
+                        Margin = new Thickness(12, 0, 12, 0)
+                    };
+                    button.HorizontalContentAlignment = HorizontalAlignment.Center;
+                    button.VerticalContentAlignment = VerticalAlignment.Center;
+                }
             }
             else
             {
-                flyout.CreateFlyoutItem(() => TextCopy_Click(hyperlink.XamlRoot, link), Strings.Copy, Icons.DocumentCopy);
+                var text = type switch
+                {
+                    TextEntityTypeHashtag or TextEntityTypeCashtag => Strings.CopyHashtag,
+                    TextEntityTypeEmailAddress => Strings.CopyMail,
+                    _ => Strings.Copy
+                };
+
+                flyout.CreateFlyoutItem(() => TextCopy_Click(hyperlink.XamlRoot, link), text, Icons.Copy);
             }
         }
 
@@ -1702,7 +1775,7 @@ namespace Telegram.Common
 
                 var flyout = new MenuFlyout();
                 flyout.CreateFlyoutItem(() => LinkOpen_Click(sender.XamlRoot, link), Strings.Open, Icons.OpenIn);
-                flyout.CreateFlyoutItem(() => LinkCopy_Click(sender.XamlRoot, link), Strings.Copy, Icons.DocumentCopy);
+                flyout.CreateFlyoutItem(() => LinkCopy_Click(sender.XamlRoot, link), Strings.Copy, Icons.Copy);
 
                 // We don't want to unfocus the text are when the context menu gets opened
                 flyout.ShowAt(sender, new FlyoutShowOptions { Position = point, ShowMode = FlyoutShowMode.Transient });

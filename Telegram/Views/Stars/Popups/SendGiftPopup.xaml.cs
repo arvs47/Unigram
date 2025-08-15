@@ -1,7 +1,14 @@
-﻿using System;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using System;
 using System.Threading.Tasks;
 using Telegram.Common;
 using Telegram.Controls;
+using Telegram.Controls.Drawers;
 using Telegram.Controls.Media;
 using Telegram.Converters;
 using Telegram.Navigation.Services;
@@ -45,14 +52,13 @@ namespace Telegram.Views.Stars.Popups
 
             clientService.TryGetChatFromUser(clientService.Options.MyId, out Chat chat);
 
-            var content = new MessageGift(gift, clientService.MyId, string.Empty, new FormattedText(string.Empty, Array.Empty<TextEntity>()), gift.DefaultSellStarCount, 0, false, false, false, false, false, false, string.Empty);
-            var message = new Message(0, new MessageSenderUser(clientService.Options.MyId), 0, null, null, false, false, false, false, false, false, false, 0, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, content, null);
+            var content = new MessageGift(gift, clientService.MyId, _receiverId, string.Empty, new FormattedText(string.Empty, Array.Empty<TextEntity>()), gift.DefaultSellStarCount, 0, false, false, false, false, false, false, string.Empty);
+            var message = new Message(0, new MessageSenderUser(clientService.Options.MyId), 0, null, null, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, content, null);
 
-            var playback = TypeResolver.Current.Playback;
             var settings = TypeResolver.Current.Resolve<ISettingsService>(clientService.SessionId);
 
             var delegato = new ChatMessageDelegate(clientService, settings, chat);
-            var viewModel = new MessageViewModel(clientService, playback, delegato, chat, null, message, true);
+            var viewModel = new MessageViewModel(clientService, delegato, chat, null, null, message, true);
 
             BackgroundControl.Update(clientService, null);
             Message.UpdateMessage(viewModel);
@@ -102,16 +108,27 @@ namespace Telegram.Views.Stars.Popups
                 }
             }
 
+            if (clientService.TryGetChat(gift.PublisherChatId, out Chat publisherChat)
+                && clientService.TryGetSupergroup(publisherChat, out Supergroup publisher)
+                && publisher.HasActiveUsername(out string username))
+            {
+                Publisher.Visibility = Visibility.Visible;
+                TextBlockHelper.SetMarkdown(PublisherLabel, string.Format(Strings.Gift2ActionReleasedBy, $"@{username}"));
+            }
+            else
+            {
+                Publisher.Visibility = Visibility.Collapsed;
+            }
+
             if (gift.TotalCount > 0)
             {
                 LimitedRoot.Visibility = Visibility.Visible;
 
-                PrevLimit.Text = Locale.Declension(Strings.R.Gift2AvailabilitySold, gift.TotalCount - gift.RemainingCount);
-                NextLimit.Text = Locale.Declension(Strings.R.Gift2AvailabilityLeft, gift.RemainingCount);
-                NextLimitBelow.Text = Locale.Declension(Strings.R.Gift2AvailabilityLeft, gift.RemainingCount);
+                PrevLimit.Text = PrevLimitAbove.Text = Locale.Declension(Strings.R.Gift2AvailabilitySold, gift.TotalCount - gift.RemainingCount);
+                NextLimit.Text = NextLimitBelow.Text = Locale.Declension(Strings.R.Gift2AvailabilityLeft, gift.RemainingCount);
             }
 
-            PurchaseText.Text = Locale.Declension(Strings.R.Gift2Send, gift.StarCount).Replace("\u2B50", Icons.Premium);
+            PurchaseText.Text = Locale.Declension(Strings.R.Gift2Send, gift.StarCount).ReplaceStar(Icons.Premium);
 
             InitializeGiftsForResale();
         }
@@ -143,13 +160,12 @@ namespace Telegram.Views.Stars.Popups
             clientService.TryGetChatFromUser(clientService.Options.MyId, out Chat chat);
 
             var content = new MessageGiftedPremium(_clientService.Options.MyId, userId, new FormattedText(string.Empty, Array.Empty<TextEntity>()), _option.Currency, _option.Amount, string.Empty, 0, _option.MonthCount, _option.Sticker);
-            var message = new Message(0, new MessageSenderUser(clientService.Options.MyId), 0, null, null, false, false, false, false, false, false, false, 0, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, content, null);
+            var message = new Message(0, new MessageSenderUser(clientService.Options.MyId), 0, null, null, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, content, null);
 
-            var playback = TypeResolver.Current.Playback;
             var settings = TypeResolver.Current.Resolve<ISettingsService>(clientService.SessionId);
 
             var delegato = new ChatMessageDelegate(clientService, settings, chat);
-            var viewModel = new MessageViewModel(clientService, playback, delegato, chat, null, message, true);
+            var viewModel = new MessageViewModel(clientService, delegato, chat, null, null, message, true);
 
             BackgroundControl.Update(clientService, null);
             Message.UpdateMessage(viewModel);
@@ -185,9 +201,9 @@ namespace Telegram.Views.Stars.Popups
             MessageContent content;
             if (_gift != null)
             {
-                content = new MessageGift(_gift, _clientService.MyId, string.Empty, text, _gift.DefaultSellStarCount, Upgradeable.IsChecked is true ? _gift.UpgradeStarCount : 0, false, false, false, false, false, false, string.Empty);
+                content = new MessageGift(_gift, _clientService.MyId, _receiverId, string.Empty, text, _gift.DefaultSellStarCount, Upgradeable.IsChecked is true ? _gift.UpgradeStarCount : 0, false, false, false, false, false, false, string.Empty);
 
-                PurchaseText.Text = Locale.Declension(Strings.R.Gift2Send, _gift.StarCount + (Upgradeable.IsChecked is true ? _gift.UpgradeStarCount : 0)).Replace("\u2B50", Icons.Premium);
+                PurchaseText.Text = Locale.Declension(Strings.R.Gift2Send, _gift.StarCount + (Upgradeable.IsChecked is true ? _gift.UpgradeStarCount : 0)).ReplaceStar(Icons.Premium);
             }
             else if (_option != null && _receiverId is MessageSenderUser user)
             {
@@ -201,13 +217,12 @@ namespace Telegram.Views.Stars.Popups
             }
 
             _clientService.TryGetChatFromUser(_clientService.Options.MyId, out Chat chat);
-            var message = new Message(0, new MessageSenderUser(_clientService.Options.MyId), 0, null, null, false, false, false, false, false, false, false, 0, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, content, null);
+            var message = new Message(0, new MessageSenderUser(_clientService.Options.MyId), 0, null, null, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, content, null);
 
-            var playback = TypeResolver.Current.Playback;
             var settings = TypeResolver.Current.Resolve<ISettingsService>(_clientService.SessionId);
 
             var delegato = new ChatMessageDelegate(_clientService, settings, chat);
-            var viewModel = new MessageViewModel(_clientService, playback, delegato, chat, null, message, true);
+            var viewModel = new MessageViewModel(_clientService, delegato, chat, null, null, message, true);
 
             Message.UpdateMessage(viewModel);
         }
@@ -219,7 +234,7 @@ namespace Telegram.Views.Stars.Popups
             EmojiFlyout.ShowAt(CaptionPanel, new FlyoutShowOptions { ShowMode = FlyoutShowMode.Transient });
         }
 
-        private void Emoji_ItemClick(object sender, ItemClickEventArgs e)
+        private void Emoji_ItemClick(object sender, EmojiDrawerItemClickEventArgs e)
         {
             if (e.ClickedItem is EmojiData emoji)
             {

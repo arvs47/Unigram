@@ -1,4 +1,10 @@
-﻿using System;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using System;
 using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -170,7 +176,7 @@ namespace Telegram.Controls
             var content = Children[1];
 
             header.Arrange(new Rect(0, 0, header.DesiredSize.Width, header.DesiredSize.Height));
-            content.Arrange(new Rect(0, 0, content.DesiredSize.Width, content.DesiredSize.Height));
+            content.Arrange(new Rect(0, 0, finalSize.Width, Math.Max(32, Math.Max(header.DesiredSize.Height, content.DesiredSize.Height))));
 
             return finalSize;
         }

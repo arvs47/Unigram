@@ -62,11 +62,10 @@
                                                     Placement="Top"
                                                     ShowMode="Transient">
                                                 <Flyout.FlyoutPresenterStyle>
-                                                    <Style TargetType="FlyoutPresenter">
+                                                    <Style TargetType="FlyoutPresenter"
+                                                           BasedOn="{StaticResource CommandFlyoutPresenterStyle}">
                                                         <Setter Property="Padding"
                                                                 Value="0" />
-                                                        <Setter Property="CornerRadius"
-                                                                Value="8" />
                                                     </Style>
                                                 </Flyout.FlyoutPresenterStyle>
                                                 <drawers:EmojiDrawer x:Name="EmojiPanel"
@@ -199,7 +198,9 @@
                                                                   Padding="0"
                                                                   Margin="0,2,0,2">
                                             <controls:BadgeButton Click="{x:Bind ViewModel.Include.Load}"
-                                                                  Content="{x:Bind ConvertRemanining(ViewModel.Include.RemainingCount), Mode=OneWay}" />
+                                                                  Content="{x:Bind ConvertRemanining(ViewModel.Include.RemainingCount), Mode=OneWay}"
+                                                                  Style="{StaticResource GlyphBadgeButtonStyle}"
+                                                                  Glyph="&#xEACB;" />
                                         </controls:HeaderedControl>
 
                                         <TextBlock Text="{CustomResource FilterIncludeInfo}"
@@ -255,7 +256,9 @@
                                                           Padding="0"
                                                           Margin="0,2,0,2">
                                     <controls:BadgeButton Click="{x:Bind ViewModel.Exclude.Load}"
-                                                          Content="{x:Bind ConvertRemanining(ViewModel.Exclude.RemainingCount), Mode=OneWay}" />
+                                                          Content="{x:Bind ConvertRemanining(ViewModel.Exclude.RemainingCount), Mode=OneWay}"
+                                                          Style="{StaticResource GlyphBadgeButtonStyle}"
+                                                          Glyph="&#xEACB;" />
                                 </controls:HeaderedControl>
 
                                 <TextBlock Text="{CustomResource FilterExcludeInfo}"

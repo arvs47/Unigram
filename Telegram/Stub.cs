@@ -211,21 +211,6 @@ public static class FormattedText_stub
         }
     }
 }
-public static class Message_stub
-{
-    public static string ToString_stub(this Telegram.Td.Api.Message sender)
-    {
-        try
-        {
-            return sender.ToString();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(Environment.StackTrace);
-            throw new RuntimeException(ex);
-        }
-    }
-}
 public static class AppCapability_stub
 {
     public static Windows.Security.Authorization.AppCapabilityAccess.AppCapabilityAccessStatus CheckAccess_stub(this Windows.Security.Authorization.AppCapabilityAccess.AppCapability sender)
@@ -1440,18 +1425,6 @@ public static class CompositionDevice_stub
 }
 public static class DirectRectangleClip_stub
 {
-    public static void AnimateBottom_stub(this Telegram.Native.Composition.DirectRectangleClip sender, Windows.UI.Composition.Compositor compositor, float from, float to, double duration)
-    {
-        try
-        {
-            sender.AnimateBottom(compositor, from, to, duration);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(Environment.StackTrace);
-            throw new RuntimeException(ex);
-        }
-    }
     public static void AnimateBottomLeft_stub(this Telegram.Native.Composition.DirectRectangleClip sender, Windows.UI.Composition.Compositor compositor, float from, float to, double duration)
     {
         try
@@ -1469,18 +1442,6 @@ public static class DirectRectangleClip_stub
         try
         {
             sender.AnimateBottomRight(compositor, from, to, duration);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(Environment.StackTrace);
-            throw new RuntimeException(ex);
-        }
-    }
-    public static void AnimateTop_stub(this Telegram.Native.Composition.DirectRectangleClip sender, Windows.UI.Composition.Compositor compositor, float from, float to, double duration)
-    {
-        try
-        {
-            sender.AnimateTop(compositor, from, to, duration);
         }
         catch (Exception ex)
         {
@@ -2938,6 +2899,36 @@ public static class ContentDialogButtonClickEventArgs_stub
         }
     }
 }
+public static class ContentDialogClosingDeferral_stub
+{
+    public static void Complete_stub(this Windows.UI.Xaml.Controls.ContentDialogClosingDeferral sender)
+    {
+        try
+        {
+            sender.Complete();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+}
+public static class ContentDialogClosingEventArgs_stub
+{
+    public static Windows.UI.Xaml.Controls.ContentDialogClosingDeferral GetDeferral_stub(this Windows.UI.Xaml.Controls.ContentDialogClosingEventArgs sender)
+    {
+        try
+        {
+            return sender.GetDeferral();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+}
 public static class Control_stub
 {
     public static bool Focus_stub(this Windows.UI.Xaml.Controls.Control sender, Windows.UI.Xaml.FocusState value)
@@ -3018,11 +3009,11 @@ public static class Frame_stub
             throw new RuntimeException(ex);
         }
     }
-    public static bool Navigate_stub(this Windows.UI.Xaml.Controls.Frame sender, System.Type sourcePageType)
+    public static bool Navigate_stub(this Windows.UI.Xaml.Controls.Frame sender, System.Type sourcePageType, object parameter, Windows.UI.Xaml.Media.Animation.NavigationTransitionInfo infoOverride)
     {
         try
         {
-            return sender.Navigate(sourcePageType);
+            return sender.Navigate(sourcePageType, parameter, infoOverride);
         }
         catch (Exception ex)
         {
@@ -3030,11 +3021,11 @@ public static class Frame_stub
             throw new RuntimeException(ex);
         }
     }
-    public static bool Navigate_stub(this Windows.UI.Xaml.Controls.Frame sender, System.Type sourcePageType, object parameter, Windows.UI.Xaml.Media.Animation.NavigationTransitionInfo infoOverride)
+    public static bool Navigate_stub(this Windows.UI.Xaml.Controls.Frame sender, System.Type sourcePageType)
     {
         try
         {
-            return sender.Navigate(sourcePageType, parameter, infoOverride);
+            return sender.Navigate(sourcePageType);
         }
         catch (Exception ex)
         {
@@ -3943,6 +3934,21 @@ public static class CryptographicBuffer_stub
         }
     }
 }
+public static class BindingOperations_stub
+{
+    public static void SetBinding_stub(Windows.UI.Xaml.DependencyObject target, Windows.UI.Xaml.DependencyProperty dp, Windows.UI.Xaml.Data.BindingBase binding)
+    {
+        try
+        {
+            Windows.UI.Xaml.Data.BindingOperations.SetBinding(target, dp, binding);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+}
 public static class Clipboard_stub
 {
     public static void Flush_stub()
@@ -3984,30 +3990,6 @@ public static class Clipboard_stub
 }
 public static class DataPackage_stub
 {
-    public static Windows.ApplicationModel.DataTransfer.DataPackageView GetView_stub(this Windows.ApplicationModel.DataTransfer.DataPackage sender)
-    {
-        try
-        {
-            return sender.GetView();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(Environment.StackTrace);
-            throw new RuntimeException(ex);
-        }
-    }
-    public static void SetApplicationLink_stub(this Windows.ApplicationModel.DataTransfer.DataPackage sender, System.Uri value)
-    {
-        try
-        {
-            sender.SetApplicationLink(value);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(Environment.StackTrace);
-            throw new RuntimeException(ex);
-        }
-    }
     public static void SetBitmap_stub(this Windows.ApplicationModel.DataTransfer.DataPackage sender, Windows.Storage.Streams.RandomAccessStreamReference value)
     {
         try
@@ -4049,18 +4031,6 @@ public static class DataPackage_stub
         try
         {
             sender.SetText(value);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(Environment.StackTrace);
-            throw new RuntimeException(ex);
-        }
-    }
-    public static void SetWebLink_stub(this Windows.ApplicationModel.DataTransfer.DataPackage sender, System.Uri value)
-    {
-        try
-        {
-            sender.SetWebLink(value);
         }
         catch (Exception ex)
         {
@@ -4283,6 +4253,18 @@ public static class XamlDirect_stub
         try
         {
             sender.SetStringProperty(xamlDirectObject, propertyIndex, value);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static void SetThicknessProperty_stub(this Windows.UI.Xaml.Core.Direct.XamlDirect sender, Windows.UI.Xaml.Core.Direct.IXamlDirectObject xamlDirectObject, Windows.UI.Xaml.Core.Direct.XamlPropertyIndex propertyIndex, Windows.UI.Xaml.Thickness value)
+    {
+        try
+        {
+            sender.SetThicknessProperty(xamlDirectObject, propertyIndex, value);
         }
         catch (Exception ex)
         {
@@ -4608,11 +4590,11 @@ public static class CanvasGeometry_stub
             throw new RuntimeException(ex);
         }
     }
-    public static Microsoft.Graphics.Canvas.Geometry.CanvasGeometry CreateRoundedRectangle_stub(Microsoft.Graphics.Canvas.ICanvasResourceCreator resourceCreator, Windows.Foundation.Rect rect, float radiusX, float radiusY)
+    public static Microsoft.Graphics.Canvas.Geometry.CanvasGeometry CreateRectangle_stub(Microsoft.Graphics.Canvas.ICanvasResourceCreator resourceCreator, Windows.Foundation.Rect rect)
     {
         try
         {
-            return Microsoft.Graphics.Canvas.Geometry.CanvasGeometry.CreateRoundedRectangle(resourceCreator, rect, radiusX, radiusY);
+            return Microsoft.Graphics.Canvas.Geometry.CanvasGeometry.CreateRectangle(resourceCreator, rect);
         }
         catch (Exception ex)
         {
@@ -4625,6 +4607,30 @@ public static class CanvasGeometry_stub
         try
         {
             return Microsoft.Graphics.Canvas.Geometry.CanvasGeometry.CreateRoundedRectangle(resourceCreator, x, y, w, h, radiusX, radiusY);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static Microsoft.Graphics.Canvas.Geometry.CanvasGeometry CreateRoundedRectangle_stub(Microsoft.Graphics.Canvas.ICanvasResourceCreator resourceCreator, Windows.Foundation.Rect rect, float radiusX, float radiusY)
+    {
+        try
+        {
+            return Microsoft.Graphics.Canvas.Geometry.CanvasGeometry.CreateRoundedRectangle(resourceCreator, rect, radiusX, radiusY);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static Microsoft.Graphics.Canvas.Geometry.CanvasGeometry CreateText_stub(Microsoft.Graphics.Canvas.Text.CanvasTextLayout textLayout)
+    {
+        try
+        {
+            return Microsoft.Graphics.Canvas.Geometry.CanvasGeometry.CreateText(textLayout);
         }
         catch (Exception ex)
         {
@@ -5850,6 +5856,18 @@ public static class ApiInformation_stub
             throw new RuntimeException(ex);
         }
     }
+    public static bool IsMethodPresent_stub(string typeName, string methodName)
+    {
+        try
+        {
+            return Windows.Foundation.Metadata.ApiInformation.IsMethodPresent(typeName, methodName);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
     public static bool IsPropertyPresent_stub(string typeName, string propertyName)
     {
         try
@@ -5952,7 +5970,7 @@ public static class CachedVideoAnimation_stub
             throw new RuntimeException(ex);
         }
     }
-    public static void RenderSync_stub(this Telegram.Native.CachedVideoAnimation sender, Windows.Storage.Streams.IBuffer bitmap, out int seconds, out bool completed)
+    public static void RenderSync_stub(this Telegram.Native.CachedVideoAnimation sender, Windows.Storage.Streams.IBuffer bitmap, out double seconds, out bool completed)
     {
         try
         {
@@ -6036,6 +6054,30 @@ public static class LokiRng_stub
 }
 public static class NativeUtils_stub
 {
+    public static Windows.UI.Xaml.Core.Direct.IXamlDirectObject AddRunToCollection_stub(Windows.UI.Xaml.Core.Direct.XamlDirect direct, Windows.UI.Xaml.Core.Direct.IXamlDirectObject inlines, string text, int offset, int length, Windows.UI.Xaml.FlowDirection direction, bool italic, Windows.UI.Text.TextDecorations decorations, Windows.UI.Xaml.Media.FontFamily fontFamily, double fontSize, bool transparent)
+    {
+        try
+        {
+            return Telegram.Native.NativeUtils.AddRunToCollection(direct, inlines, text, offset, length, direction, italic, decorations, fontFamily, fontSize, transparent);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static Windows.UI.Xaml.Core.Direct.IXamlDirectObject AddRunToCollection_stub(Windows.UI.Xaml.Core.Direct.XamlDirect direct, Windows.UI.Xaml.Core.Direct.IXamlDirectObject inlines, string text, Windows.UI.Xaml.FlowDirection direction, bool italic, Windows.UI.Text.TextDecorations decorations, Windows.UI.Xaml.Media.FontFamily fontFamily, double fontSize, bool transparent)
+    {
+        try
+        {
+            return Telegram.Native.NativeUtils.AddRunToCollection(direct, inlines, text, direction, italic, decorations, fontFamily, fontSize, transparent);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
     public static void Crash_stub()
     {
         try
@@ -6306,11 +6348,71 @@ public static class PlaceholderImageHelper_stub
             throw new RuntimeException(ex);
         }
     }
-    public static void Encode_stub(this Telegram.Native.PlaceholderImageHelper sender, Windows.Storage.Streams.IBuffer source, Windows.Storage.Streams.IRandomAccessStream destination, int width, int height)
+    public static void Encode_stub(this Telegram.Native.PlaceholderImageHelper sender, Windows.Storage.Streams.IBuffer source, Windows.Storage.Streams.IRandomAccessStream destination, int width, int height, int rotation)
     {
         try
         {
-            sender.Encode(source, destination, width, height);
+            sender.Encode(source, destination, width, height, rotation);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static Windows.UI.Composition.CompositionPath GetEllipticalClip_stub(this Telegram.Native.PlaceholderImageHelper sender, float width, float height, float radius, float x, float y)
+    {
+        try
+        {
+            return sender.GetEllipticalClip(width, height, radius, x, y);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static Windows.UI.Composition.CompositionPath GetOutline_stub(this Telegram.Native.PlaceholderImageHelper sender, System.Collections.Generic.IList<Telegram.Td.Api.ClosedVectorPath> contours)
+    {
+        try
+        {
+            return sender.GetOutline(contours);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static Windows.UI.Composition.CompositionPath GetReplyMarkupClip_stub(this Telegram.Native.PlaceholderImageHelper sender, System.Collections.Generic.IList<System.Collections.Generic.IList<Windows.Foundation.Rect>> buttons, float bottomRightRadius, float bottomLeftRadius)
+    {
+        try
+        {
+            return sender.GetReplyMarkupClip(buttons, bottomRightRadius, bottomLeftRadius);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static Windows.UI.Composition.CompositionPath GetTail_stub(this Telegram.Native.PlaceholderImageHelper sender, float width, float height, float topLeftRadius, float topRightRadius, float bottomRightRadius, float bottomLeftRadius)
+    {
+        try
+        {
+            return sender.GetTail(width, height, topLeftRadius, topRightRadius, bottomRightRadius, bottomLeftRadius);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static Windows.UI.Composition.CompositionPath GetVoiceNoteClip_stub(this Telegram.Native.PlaceholderImageHelper sender, System.Collections.Generic.IList<byte> waveform, double waveformWidth)
+    {
+        try
+        {
+            return sender.GetVoiceNoteClip(waveform, waveformWidth);
         }
         catch (Exception ex)
         {
@@ -6330,6 +6432,18 @@ public static class PlaceholderImageHelper_stub
             throw new RuntimeException(ex);
         }
     }
+    public static Windows.Foundation.Rect LayoutMetrics_stub(this Telegram.Native.PlaceholderImageHelper sender, string text, int offset, int length, System.Collections.Generic.IList<Telegram.Td.Api.TextEntity> entities, double fontSize, double width, bool rtl)
+    {
+        try
+        {
+            return sender.LayoutMetrics(text, offset, length, entities, fontSize, width, rtl);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
     public static System.Collections.Generic.IList<Windows.Foundation.Rect> LineMetrics_stub(this Telegram.Native.PlaceholderImageHelper sender, string text, System.Collections.Generic.IList<Telegram.Td.Api.TextEntity> entities, double fontSize, double width, bool rtl)
     {
         try
@@ -6342,11 +6456,11 @@ public static class PlaceholderImageHelper_stub
             throw new RuntimeException(ex);
         }
     }
-    public static System.Collections.Generic.IList<Windows.Foundation.Rect> RangeMetrics_stub(this Telegram.Native.PlaceholderImageHelper sender, string text, int offset, int length, System.Collections.Generic.IList<Telegram.Td.Api.TextEntity> entities, double fontSize, double width, bool rtl)
+    public static System.Collections.Generic.IList<Windows.Foundation.Rect> RangeMetrics_stub(this Telegram.Native.PlaceholderImageHelper sender, string text, int offset, int length, System.Collections.Generic.IList<Telegram.Td.Api.TextEntity> entities, double fontSize, double width, bool rtl, bool wrap)
     {
         try
         {
-            return sender.RangeMetrics(text, offset, length, entities, fontSize, width, rtl);
+            return sender.RangeMetrics(text, offset, length, entities, fontSize, width, rtl, wrap);
         }
         catch (Exception ex)
         {
@@ -6408,7 +6522,7 @@ public static class VideoAnimation_stub
             throw new RuntimeException(ex);
         }
     }
-    public static int RenderSync_stub(this Telegram.Native.VideoAnimation sender, Windows.Storage.Streams.IBuffer bitmap, int width, int height, bool preview, out int seconds)
+    public static int RenderSync_stub(this Telegram.Native.VideoAnimation sender, Windows.Storage.Streams.IBuffer bitmap, int width, int height, bool preview, out double seconds)
     {
         try
         {
@@ -6729,6 +6843,18 @@ public static class INumberFormatter2_stub
 }
 public static class INumberParser_stub
 {
+    public static double? ParseDouble_stub(this Windows.Globalization.NumberFormatting.INumberParser sender, string text)
+    {
+        try
+        {
+            return sender.ParseDouble(text);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
     public static long? ParseInt_stub(this Windows.Globalization.NumberFormatting.INumberParser sender, string text)
     {
         try
@@ -7121,6 +7247,30 @@ public static class ShareOperation_stub
         try
         {
             sender.ReportCompleted();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static void ReportDataRetrieved_stub(this Windows.ApplicationModel.DataTransfer.ShareTarget.ShareOperation sender)
+    {
+        try
+        {
+            sender.ReportDataRetrieved();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
+    public static void ReportError_stub(this Windows.ApplicationModel.DataTransfer.ShareTarget.ShareOperation sender, string value)
+    {
+        try
+        {
+            sender.ReportError(value);
         }
         catch (Exception ex)
         {
@@ -8736,6 +8886,18 @@ public static class UIElement_stub
 }
 public static class VisualStateManager_stub
 {
+    public static System.Collections.Generic.IList<Windows.UI.Xaml.VisualStateGroup> GetVisualStateGroups_stub(Windows.UI.Xaml.FrameworkElement obj)
+    {
+        try
+        {
+            return Windows.UI.Xaml.VisualStateManager.GetVisualStateGroups(obj);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(Environment.StackTrace);
+            throw new RuntimeException(ex);
+        }
+    }
     public static bool GoToState_stub(Windows.UI.Xaml.Controls.Control control, string stateName, bool useTransitions)
     {
         try

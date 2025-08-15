@@ -11,6 +11,7 @@ using Telegram.Controls.Media;
 using Telegram.Services;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
+using Telegram.Views;
 using Windows.UI.Composition;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Automation;
@@ -24,6 +25,7 @@ namespace Telegram.Controls.Chats
     {
         public DialogViewModel ViewModel => DataContext as DialogViewModel;
 
+        private ChatView _chatView;
         private UIElement _parent;
 
         public ChatTranslateBar()
@@ -35,10 +37,12 @@ namespace Telegram.Controls.Chats
             ElementCompositionPreview.SetIsTranslationEnabled(ShowOriginal, true);
         }
 
-        public void InitializeParent(UIElement parent)
+        public float AnimatedHeight => _collapsed ? 0 : 32;
+
+        public void InitializeParent(ChatView chatView, UIElement parent)
         {
-            _parent = parent;
-            ElementCompositionPreview.SetIsTranslationEnabled(parent, true);
+            _chatView = chatView;
+            ElementCompositionPreview.SetIsTranslationEnabled(_parent = parent, true);
         }
 
         public void UpdateChatIsTranslatable(Chat chat, string language)
@@ -57,7 +61,10 @@ namespace Telegram.Controls.Chats
                     : Visibility.Visible;
             }
 
-            ShowHide(canTranslate);
+            if (language != null || !chat.IsTranslatable)
+            {
+                ShowHide(canTranslate);
+            }
         }
 
         private bool _collapsed = true;
@@ -93,18 +100,20 @@ namespace Telegram.Controls.Chats
                 }
             };
 
+            _chatView.UpdateMessagesHeaderPadding();
+
             var clip = visual.Compositor.CreateScalarKeyFrameAnimation();
             clip.InsertKeyFrame(show ? 0 : 1, 32);
             clip.InsertKeyFrame(show ? 1 : 0, 0);
             clip.Duration = Constants.FastAnimation;
 
-            var offset = visual.Compositor.CreateVector3KeyFrameAnimation();
-            offset.InsertKeyFrame(show ? 0 : 1, new Vector3(0, -32, 0));
-            offset.InsertKeyFrame(show ? 1 : 0, new Vector3());
+            var offset = visual.Compositor.CreateScalarKeyFrameAnimation();
+            offset.InsertKeyFrame(show ? 0 : 1, -32);
+            offset.InsertKeyFrame(show ? 1 : 0, 0);
             offset.Duration = Constants.FastAnimation;
 
             visual.Clip.StartAnimation("TopInset", clip);
-            parent.StartAnimation("Translation", offset);
+            parent.StartAnimation("Translation.Y", offset);
 
             batch.End();
         }

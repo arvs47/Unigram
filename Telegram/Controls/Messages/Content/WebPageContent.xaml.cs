@@ -156,7 +156,7 @@ namespace Telegram.Controls.Messages.Content
                     Grid.SetColumn(MediaPanel, 0);
 
                     OverflowArea.Margin = new Thickness(0, 0, 0, 8);
-                    ButtonLine.Margin = new Thickness(0, 0, 0, 0);
+                    ButtonLine.Margin = new Thickness(0);
 
                     UpdateContent(message, linkPreview, false);
                     UpdateInstantView(linkPreview, _instantViewToken.Token);
@@ -401,7 +401,7 @@ namespace Telegram.Controls.Messages.Content
             UpdateWebPage(linkPreview);
 
             MediaPanel.Visibility = Visibility.Collapsed;
-            OverflowArea.Margin = new Thickness(0, 0, 0, 0);
+            OverflowArea.Margin = new Thickness(0);
 
             ButtonLine.Visibility = Visibility.Collapsed;
         }
@@ -543,7 +543,7 @@ namespace Telegram.Controls.Messages.Content
             }
             else if (linkPreview.Type is LinkPreviewTypeVideoChat videoChat)
             {
-                ShowButton(videoChat.IsLiveStream ? Strings.VoipGroupJoinAsSpeaker : Strings.VoipGroupJoinAsLinstener);
+                ShowButton(videoChat.JoinsAsSpeaker ? Strings.VoipGroupJoinAsSpeaker : Strings.VoipGroupJoinAsLinstener);
             }
             else if (linkPreview.Type is LinkPreviewTypeBackground)
             {
@@ -756,29 +756,30 @@ namespace Telegram.Controls.Messages.Content
         }
     }
 
-    public partial class WebPageUpgradedGiftContent : PatternBackground
+    public partial class WebPageUpgradedGiftContent : Grid
     {
         public WebPageUpgradedGiftContent(MessageViewModel message, LinkPreviewTypeUpgradedGift upgradedGift)
         {
-            Content = new AnimatedImage
+            var pattern = new PatternBackground
             {
-                Width = 120,
-                Height = 120,
-                FrameSize = new Windows.Foundation.Size(120, 120),
-                DecodeFrameType = Windows.UI.Xaml.Media.Imaging.DecodePixelType.Logical,
-                IsViewportAware = true,
-                LoopCount = 1,
-                Source = DelayedFileSource.FromSticker(message.ClientService, upgradedGift.Gift.Model.Sticker),
-                Padding = new Thickness(12, 2, 12, 0),
-                Margin = new Thickness(0, 0, 0, 12)
+                Content = new AnimatedImage
+                {
+                    Width = 120,
+                    Height = 120,
+                    FrameSize = new Windows.Foundation.Size(120, 120),
+                    DecodeFrameType = Windows.UI.Xaml.Media.Imaging.DecodePixelType.Logical,
+                    IsViewportAware = true,
+                    LoopCount = 1,
+                    Source = DelayedFileSource.FromSticker(message.ClientService, upgradedGift.Gift.Model.Sticker),
+                    Padding = new Thickness(12, 2, 12, 0),
+                    Margin = new Thickness(0, 0, 0, 12)
+                },
+                Width = 208
             };
-            Width = 208;
 
-            var source = DelayedFileSource.FromSticker(message.ClientService, upgradedGift.Gift.Symbol.Sticker);
-            var centerColor = upgradedGift.Gift.Backdrop.Colors.CenterColor.ToColor();
-            var edgeColor = upgradedGift.Gift.Backdrop.Colors.EdgeColor.ToColor();
+            pattern.Update(message.ClientService, upgradedGift.Gift);
 
-            Update(source, centerColor, edgeColor);
+            Children.Add(pattern);
         }
     }
 }

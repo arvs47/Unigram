@@ -11,17 +11,17 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
-using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Td;
 using Telegram.Td.Api;
 using Windows.Foundation;
 using Windows.Media.Devices;
 using Windows.Storage;
+using Windows.System;
 
 namespace Telegram.Common
 {
-    public class AsyncMediaTrack
+    public partial class AsyncMediaTrack
     {
         public AsyncMediaTrack(int width, int height)
         {
@@ -36,7 +36,9 @@ namespace Telegram.Common
 
     public partial class AsyncMediaPlayer
     {
-        private readonly IDispatcherContext _dispatcherQueue;
+        private readonly DispatcherQueue _dispatcherQueue;
+
+        private readonly AsyncMediaPlayerSwapChain _graphicsContext;
 
         private readonly LibVLC _library;
         private readonly MediaPlayer _player;
@@ -49,17 +51,21 @@ namespace Telegram.Common
         private readonly object _closeLock = new();
         private bool _closed;
 
-        public AsyncMediaPlayer(params string[] options)
+        public AsyncMediaPlayer(bool createGraphicsContext, params string[] options)
         {
-            _dispatcherQueue = WindowContext.Current.Dispatcher;
-
-            // This should be not needed
-            _dispatcherQueue ??= WindowContext.Main.Dispatcher;
-
+            _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
             _enableDebugLogs = SettingsService.Current.VerbosityLevel >= 4;
 
-            // Generating plugins cache requires a breakpoint in bank.c#504
-            _library = new LibVLC(_enableDebugLogs, options); //"--quiet", "--reset-plugins-cache");
+            if (createGraphicsContext && _dispatcherQueue != null)
+            {
+                _graphicsContext = new AsyncMediaPlayerSwapChain();
+                _library = new LibVLC(_enableDebugLogs, _graphicsContext.SwapChainOptions);
+            }
+            else
+            {
+                // Generating plugins cache requires a breakpoint in bank.c#504
+                _library = new LibVLC(_enableDebugLogs, options); //"--quiet", "--reset-plugins-cache");
+            }
 
             if (_enableDebugLogs)
             {
@@ -100,6 +106,8 @@ namespace Telegram.Common
             }
         }
 
+        public AsyncMediaPlayerSwapChain Context => _graphicsContext;
+
         public void Play(MediaInput input)
         {
             Write(valid => PlayImpl(input, valid));
@@ -128,6 +136,33 @@ namespace Telegram.Common
             else
             {
                 input.Dispose();
+            }
+        }
+
+        public void Play(Uri input)
+        {
+            Write(valid => PlayImpl(input, valid));
+        }
+
+        private void PlayImpl(Uri input, bool play)
+        {
+            if (play)
+            {
+                var media = new Media(_library, input, ":network-caching=10000");
+
+                _player.Play(media);
+
+                // We need to retain both Media and MediaInput due to the bad (IMHO) design of libvlc API.
+                // When creating a Media from a MediaInput, some callbacks are registered to access the stream.
+                // The problem is that the library creates a GC handle in MediaInput that is then used by Media
+                // to register the aforementioned callbacks. What happens, in my understanding, is that there are
+                // some good chances that MediaInput is disposed before Media, and due to that the GC handle is deleted
+                // and this causes an access violation in libvlccore when trying to raise the callbacks for the media.
+                _media?.Dispose();
+                _media = media;
+
+                _input?.Dispose();
+                _input = null;
             }
         }
 
@@ -202,6 +237,8 @@ namespace Telegram.Common
 
         private void CloseImpl()
         {
+            MediaDevice.DefaultAudioRenderDeviceChanged -= OnDefaultAudioRenderDeviceChanged;
+
             _player.ESSelected -= OnESSelected;
             _player.Vout -= OnVout;
             _player.Buffering -= OnBuffering;
@@ -233,6 +270,11 @@ namespace Telegram.Common
                 _library.Log -= OnLog;
             }
 
+            if (_graphicsContext != null)
+            {
+                _dispatcherQueue.TryEnqueue(_graphicsContext.Destroy);
+            }
+
             lock (_closeLock)
             {
                 _closed = true;
@@ -248,6 +290,11 @@ namespace Telegram.Common
             if (videoTrack is not VideoTrack track)
             {
                 return new AsyncMediaTrack(0, 0);
+            }
+
+            if (track.Orientation is VideoOrientation.RightTop or VideoOrientation.LeftTop)
+            {
+                return new AsyncMediaTrack((int)track.Height, (int)track.Width);
             }
 
             return new AsyncMediaTrack((int)track.Width, (int)track.Height);
@@ -293,57 +340,69 @@ namespace Telegram.Common
 
         private void OnVout(object sender, MediaPlayerVoutEventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => Vout?.Invoke(this, EventArgs.Empty));
+            TryEnqueue(() => Vout?.Invoke(this, EventArgs.Empty));
         }
 
         private void OnESSelected(object sender, MediaPlayerESSelectedEventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => ESSelected?.Invoke(this, e));
+            TryEnqueue(() => ESSelected?.Invoke(this, e));
         }
 
         private void OnEndReached(object sender, EventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => EndReached?.Invoke(this, EventArgs.Empty));
+            TryEnqueue(() => EndReached?.Invoke(this, EventArgs.Empty));
         }
 
         private void OnBuffering(object sender, MediaPlayerBufferingEventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => Buffering?.Invoke(this, e));
+            TryEnqueue(() => Buffering?.Invoke(this, e));
         }
 
         private void OnTimeChanged(object sender, MediaPlayerTimeChangedEventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => TimeChanged?.Invoke(this, e));
+            TryEnqueue(() => TimeChanged?.Invoke(this, e));
         }
 
         private void OnLengthChanged(object sender, MediaPlayerLengthChangedEventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => LengthChanged?.Invoke(this, e));
+            TryEnqueue(() => LengthChanged?.Invoke(this, e));
         }
 
         private void OnPlaying(object sender, EventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => Playing?.Invoke(this, EventArgs.Empty));
+            TryEnqueue(() => Playing?.Invoke(this, EventArgs.Empty));
         }
 
         private void OnPaused(object sender, EventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => Paused?.Invoke(this, EventArgs.Empty));
+            TryEnqueue(() => Paused?.Invoke(this, EventArgs.Empty));
         }
 
         private void OnStopped(object sender, EventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => Stopped?.Invoke(this, EventArgs.Empty));
+            TryEnqueue(() => Stopped?.Invoke(this, EventArgs.Empty));
         }
 
         private void OnVolumeChanged(object sender, MediaPlayerVolumeChangedEventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => VolumeChanged?.Invoke(this, e));
+            TryEnqueue(() => VolumeChanged?.Invoke(this, e));
         }
 
         private void OnEncounteredError(object sender, EventArgs e)
         {
-            _dispatcherQueue.Dispatch(() => EncounteredError?.Invoke(this, EventArgs.Empty));
+            TryEnqueue(() => EncounteredError?.Invoke(this, EventArgs.Empty));
+        }
+
+        private void TryEnqueue(DispatcherQueueHandler action)
+        {
+            if (_dispatcherQueue != null)
+            {
+                _dispatcherQueue.TryEnqueue(action);
+            }
+            else
+            {
+                ThreadPool.QueueUserWorkItem(state => action());
+            }
         }
 
         #endregion

@@ -11,7 +11,6 @@ using Telegram.Streams;
 using Telegram.Td.Api;
 using Telegram.ViewModels;
 using Windows.Foundation;
-using Windows.System;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -231,6 +230,11 @@ namespace Telegram.Controls.Messages.Content
                 premium = sticker.IsPremium;
                 return sticker.Sticker;
             }
+            else if (content is MessageAnimatedEmoji animatedEmoji)
+            {
+                premium = false;
+                return animatedEmoji.AnimatedEmoji.Sticker;
+            }
             else if (content is MessageText text && text.LinkPreview?.Type is LinkPreviewTypeSticker previewSticker)
             {
                 premium = false;
@@ -278,7 +282,7 @@ namespace Telegram.Controls.Messages.Content
                 {
                     if (Interactions?.Children.Count > 0)
                     {
-                        _message.Delegate.OpenSticker(sticker);
+                        ShowToast(_message, sticker);
                     }
                     else
                     {
@@ -292,6 +296,19 @@ namespace Telegram.Controls.Messages.Content
                 else
                 {
                     Player.Play();
+                }
+            }
+        }
+
+        private async void ShowToast(MessageViewModel message, Sticker sticker)
+        {
+            var response = await message.ClientService.SendAsync(new GetStickerSet(sticker.SetId));
+            if (response is StickerSet stickerSet)
+            {
+                var confirm = await ToastPopup.ShowActionAsync(XamlRoot, string.Format("**{0}**\n{1}", stickerSet.Title, Strings.PremiumStickerTooltip), Strings.ViewAction, new DelayedFileSource(message.ClientService, sticker));
+                if (confirm == ContentDialogResult.Primary)
+                {
+                    message.Delegate.OpenSticker(sticker);
                 }
             }
         }

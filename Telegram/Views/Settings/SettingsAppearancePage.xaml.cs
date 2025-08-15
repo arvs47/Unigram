@@ -126,7 +126,7 @@ namespace Telegram.Views.Settings
 
         private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (List.SelectedItem is ChatThemeViewModel chatTheme)
+            if (List.SelectedItem is ChatThemeViewModel chatTheme && ViewModel.SelectionChanged)
             {
                 // Speed up background preview by manually applying it
                 if (ActualTheme == ElementTheme.Light)
@@ -179,13 +179,19 @@ namespace Telegram.Views.Settings
 
         private void OnContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
         {
-            if (args.InRecycleQueue)
+            if (args.ItemContainer.ContentTemplateRoot is not ChatThemeCell content)
             {
                 return;
             }
-            else if (args.ItemContainer.ContentTemplateRoot is ChatThemeCell content && args.Item is ChatThemeViewModel theme)
+
+            if (args.InRecycleQueue)
             {
-                content.Update(theme);
+                content.Recycle();
+                return;
+            }
+            else if (args.Item is ChatThemeViewModel theme)
+            {
+                content.Update(args.ItemContainer, theme);
                 args.Handled = true;
             }
         }
@@ -263,13 +269,12 @@ namespace Telegram.Views.Settings
             var clientService = ViewModel.ClientService;
             var senderId = new MessageSenderUser(clientService.Options.MyId);
 
-            var message = new Message(0, senderId, 0, null, null, false, false, false, false, false, false, false, 0, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, null, null);
+            var message = new Message(0, senderId, 0, null, null, false, false, false, false, false, false, false, false, false, 0, 0, null, null, null, Array.Empty<UnreadReaction>(), null, null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, null, null);
 
-            var playback = TypeResolver.Current.Playback;
             var settings = TypeResolver.Current.Resolve<ISettingsService>(clientService.SessionId);
 
             var delegato = new ChatMessageDelegate(clientService, settings, null);
-            var viewModel = new MessageViewModel(clientService, playback, delegato, null, null, message, true);
+            var viewModel = new MessageViewModel(clientService, delegato, null, null, null, message, true);
 
             Reaction.SetReaction(viewModel, new MessageReaction(reaction, 1, false, senderId, new MessageSender[] { }));
 

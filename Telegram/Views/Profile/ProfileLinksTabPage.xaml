@@ -14,7 +14,7 @@
 
     <Grid>
         <controls:TableListView x:Name="ScrollingHost"
-                                ItemsSource="{x:Bind ViewModel.Links, Mode=OneWay}"
+                                ItemsSource="{x:Bind ViewModel.Links.ItemsView, Mode=OneWay}"
                                 SelectionMode="None"
                                 ChoosingItemContainer="OnChoosingItemContainer"
                                 ContainerContentChanging="OnContainerContentChanging">
@@ -40,9 +40,11 @@
             </ListView.Template>
             <ListView.Header>
                 <StackPanel>
-                    <Border Height="{x:Bind ViewModel.HeaderHeight, Mode=OneWay}" />
+                    <Border x:Name="Header" />
 
-                    <Grid MaxWidth="1000"
+                    <Grid x:Name="SearchRoot"
+                          x:Load="False"
+                          MaxWidth="1000"
                           Margin="24,0">
                         <TextBox x:Name="Search"
                                  Text="{x:Bind ViewModel.Links.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"

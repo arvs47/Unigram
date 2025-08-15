@@ -23,7 +23,6 @@ using Telegram.Views;
 using Telegram.Views.Popups;
 using Windows.Foundation;
 using Windows.UI.Xaml;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.ViewModels
 {
@@ -137,7 +136,7 @@ namespace Telegram.ViewModels
                     }
                 }
 
-                NavigationService.NavigateToChat(chatId, messageId, topic: messageTopic, state: new NavigationState { { "highlight", replyToMessage.Quote } });
+                NavigationService.NavigateToChat(chatId, messageId, topic: messageTopic, state: new NavigationState { { "highlight", replyToMessage.Quote }, { "checklist_task_id", replyToMessage.ChecklistTaskId } });
             }
             else if (replyToMessage.Origin != null && replyToMessage.MessageId == 0)
             {
@@ -147,7 +146,7 @@ namespace Telegram.ViewModels
             }
             else if (replyToMessage.ChatId == message.ChatId || replyToMessage.ChatId == 0)
             {
-                await LoadMessageSliceAsync(message.Id, replyToMessage.MessageId, highlight: replyToMessage.Quote);
+                await LoadMessageSliceAsync(message.Id, replyToMessage.MessageId, highlight: replyToMessage.Quote, checklistTaskId: replyToMessage.ChecklistTaskId);
             }
         }
 
@@ -382,15 +381,15 @@ namespace Telegram.ViewModels
             _messageDelegate.OpenUrl(url, untrust, source);
         }
 
-        public async void OpenMedia(MessageViewModel message, FrameworkElement target, int timestamp = 0)
+        public async void OpenMedia(MessageViewModel message, FrameworkElement target, double timestamp = 0)
         {
             if (message.Content is MessageAudio or MessageVoiceNote)
             {
-                _playbackService.Play(message, Topic);
+                TypeResolver.Current.Playback.Play(message, Topic);
 
                 if (timestamp > 0)
                 {
-                    _playbackService.Seek(TimeSpan.FromSeconds(timestamp));
+                    TypeResolver.Current.Playback.Seek(TimeSpan.FromSeconds(timestamp));
                 }
             }
             else if (message.Content is MessagePoll poll)
@@ -465,13 +464,19 @@ namespace Telegram.ViewModels
                             };
                         }
 
+                        var response = await ClientService.SendAsync(new GetMessageProperties(message.ChatId, message.Id));
+                        if (response is not MessageProperties properties)
+                        {
+                            return;
+                        }
+
                         if (IsSingle(message.Content))
                         {
-                            viewModel = new StandaloneGalleryViewModel(ClientService, _storageService, Aggregator, new GalleryMessage(ClientService, message));
+                            viewModel = new StandaloneGalleryViewModel(ClientService, _storageService, Aggregator, new GalleryMessage(ClientService, message, properties));
                         }
                         else
                         {
-                            viewModel = new ChatGalleryViewModel(ClientService, _storageService, Aggregator, message.ChatId, Topic, message);
+                            viewModel = new ChatGalleryViewModel(ClientService, _storageService, Aggregator, message.ChatId, Topic, message, properties);
                         }
                     }
 
@@ -482,7 +487,7 @@ namespace Telegram.ViewModels
             }
         }
 
-        public void OpenPaidMedia(MessageViewModel message, PaidMedia media, FrameworkElement target, int timestamp = 0)
+        public void OpenPaidMedia(MessageViewModel message, PaidMedia media, FrameworkElement target, double timestamp = 0)
         {
             if (message.Content is MessagePaidAlbum album)
             {
@@ -521,7 +526,7 @@ namespace Telegram.ViewModels
 
         public void PlayMessage(MessageViewModel message)
         {
-            _playbackService.Play(message, Topic);
+            TypeResolver.Current.Playback.Play(message, Topic);
         }
 
         public bool RecognizeSpeech(MessageViewModel message)

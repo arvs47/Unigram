@@ -92,7 +92,7 @@
                        FontWeight="SemiBold"
                        Margin="16,0,0,0"
                        VerticalAlignment="Bottom">
-                <Run Text="Ad"
+                <Run Text="{CustomResource SponsoredMessageAd}"
                      Foreground="{ThemeResource SystemColorControlAccentBrush}" />
                 <Run x:Name="TitleText" />
             </TextBlock>
@@ -112,7 +112,7 @@
         </Grid>
 
         <controls:FormattedTextBlock x:Name="MessageText"
-                                     TextStyle="{StaticResource CaptionRichTextBlockStyle}"
+                                     Style="{StaticResource CaptionFormattedTextBlockStyle}"
                                      Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"
                                      AutoFontSize="False"
                                      IsTextSelectionEnabled="False"

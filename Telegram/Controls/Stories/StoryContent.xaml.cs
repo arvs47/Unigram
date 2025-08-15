@@ -9,6 +9,7 @@ using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using Telegram.Common;
@@ -30,7 +31,6 @@ using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Shapes;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Controls.Stories
 {
@@ -576,6 +576,28 @@ namespace Telegram.Controls.Stories
 
                     var window = element.GetParent<StoriesWindow>();
                     var result = await window?.ShowActionAsync(target, text, TeachingTipPlacementMode.Top);
+
+                    if (result == ContentDialogResult.Primary)
+                    {
+                        try
+                        {
+                            Location location = area.Type switch
+                            {
+                                StoryAreaTypeLocation typeLocation => typeLocation.Location,
+                                StoryAreaTypeVenue typeVenue => typeVenue.Venue.Location,
+                                _ => null
+                            };
+
+                            var options = new Windows.System.LauncherOptions();
+                            options.FallbackUri = new Uri(string.Format(CultureInfo.InvariantCulture, "https://www.google.com/maps/search/?api=1&query={0},{1}", location.Latitude, location.Longitude));
+
+                            await Windows.System.Launcher.LaunchUriAsync(new Uri(string.Format(CultureInfo.InvariantCulture, "bingmaps:?collection=point.{0}_{1}", location.Latitude, location.Longitude)), options);
+                        }
+                        catch
+                        {
+                            // All the remote procedure calls must be wrapped in a try-catch block
+                        }
+                    }
                 }
                 else if (area.Type is StoryAreaTypeMessage typeMessage)
                 {
@@ -688,9 +710,8 @@ namespace Telegram.Controls.Stories
 
             visual.StartAnimation("Scale", scale);
 
-            var device = ElementComposition.GetSharedDevice();
-            var rect1 = CanvasGeometry.CreateRoundedRectangle(device, 0, 0, ActualSize.X, ActualSize.Y, 8, 8);
-            var rect2 = CanvasGeometry.CreateRoundedRectangle(device, 0, 0, ActualSize.X, ActualSize.Y, 8 * 2.5f, 8 * 2.5f);
+            var rect1 = CanvasGeometry.CreateRoundedRectangle(null, 0, 0, ActualSize.X, ActualSize.Y, 8, 8);
+            var rect2 = CanvasGeometry.CreateRoundedRectangle(null, 0, 0, ActualSize.X, ActualSize.Y, 8 * 2.5f, 8 * 2.5f);
 
             var geometry1 = compositor.CreatePathGeometry(new CompositionPath(rect1));
             var clip1 = compositor.CreateGeometricClip(geometry1);
@@ -1233,7 +1254,7 @@ namespace Telegram.Controls.Stories
 
             Logger.Info();
 
-            _player = new AsyncMediaPlayer(e.SwapChainOptions);
+            _player = new AsyncMediaPlayer(false, e.SwapChainOptions);
             _player.ESSelected += OnESSelected;
             _player.Vout += OnVout;
             _player.Buffering += OnBuffering;

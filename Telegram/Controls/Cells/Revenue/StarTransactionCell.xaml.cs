@@ -1,4 +1,10 @@
-﻿using System.Collections.Generic;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using System.Collections.Generic;
 using Telegram.Common;
 using Telegram.Controls.Media;
 using Telegram.Converters;
@@ -27,7 +33,55 @@ namespace Telegram.Controls.Cells.Revenue
             UpdateManager.Unsubscribe(this, ref _media1Token, true);
             UpdateManager.Unsubscribe(this, ref _media2Token, true);
 
-            if (transaction.Type is StarTransactionTypePremiumBotDeposit)
+            if (transaction.Type is StarTransactionTypePremiumPurchase premiumPurchase)
+            {
+                var user = clientService.GetUser(premiumPurchase.UserId);
+
+                Subtitle.Visibility = Visibility.Visible;
+                Photo.SetUser(clientService, user, 36);
+                MediaPreview.Visibility = Visibility.Collapsed;
+
+                Title.Text = user.FullName();
+                Subtitle.Text = Strings.StarsTransactionPremiumGift;
+            }
+            else if (transaction.Type is StarTransactionTypeUpgradedGiftSale upgradedGiftSale)
+            {
+                var user = clientService.GetUser(upgradedGiftSale.UserId);
+
+                Subtitle.Visibility = Visibility.Visible;
+                Photo.SetUser(clientService, user, 36);
+                MediaPreview.Visibility = Visibility.Collapsed;
+
+                Title.Text = user.FullName();
+                Subtitle.Text = transaction.IsRefund
+                    ? Strings.StarGiftTransactionGiftSaleRefund
+                    : Strings.StarGiftTransactionGiftSale;
+            }
+            else if (transaction.Type is StarTransactionTypeUpgradedGiftPurchase upgradedGiftPurchase)
+            {
+                var user = clientService.GetUser(upgradedGiftPurchase.UserId);
+
+                Subtitle.Visibility = Visibility.Visible;
+                Photo.SetUser(clientService, user, 36);
+                MediaPreview.Visibility = Visibility.Collapsed;
+
+                Title.Text = user.FullName();
+                Subtitle.Text = transaction.IsRefund
+                    ? Strings.StarGiftTransactionGiftPurchaseRefund
+                    : Strings.StarGiftTransactionGiftPurchase;
+            }
+            else if (transaction.Type is StarTransactionTypeGiftTransfer giftTransfer)
+            {
+                Subtitle.Visibility = Visibility.Visible;
+                Photo.SetMessageSender(clientService, giftTransfer.OwnerId, 36);
+                MediaPreview.Visibility = Visibility.Collapsed;
+
+                Title.Text = clientService.GetTitle(giftTransfer.OwnerId);
+                Subtitle.Text = transaction.IsRefund
+                    ? Strings.StarGiftTransactionGiftTransferRefund
+                    : Strings.StarGiftTransactionGiftTransfer;
+            }
+            else if (transaction.Type is StarTransactionTypePremiumBotDeposit)
             {
                 MediaPreview.Visibility = Visibility.Collapsed;
                 Photo.Source = new PlaceholderImage(Icons.Premium, true, Color.FromArgb(0xFF, 0xFD, 0xD2, 0x1A), Color.FromArgb(0xFF, 0xE4, 0x7B, 0x03));
@@ -110,7 +164,7 @@ namespace Telegram.Controls.Cells.Revenue
                 MediaPreview.Visibility = Visibility.Collapsed;
 
                 Title.Text = user.FullName();
-                Subtitle.Text = transaction.StarAmount.IsNegative()
+                Subtitle.Text = transaction.IsRefund
                     ? Strings.Gift2TransactionRefundedConverted
                     : Strings.Gift2TransactionConverted;
             }
@@ -121,7 +175,7 @@ namespace Telegram.Controls.Cells.Revenue
                 Subtitle.Visibility = Visibility.Visible;
                 MediaPreview.Visibility = Visibility.Collapsed;
 
-                Title.Text = transaction.StarAmount.IsNegative()
+                Title.Text = transaction.IsRefund
                     ? Strings.StarsGiftSent
                     : Strings.StarsGiftReceived;
 
@@ -151,7 +205,7 @@ namespace Telegram.Controls.Cells.Revenue
 
                 Subtitle.Visibility = Visibility.Visible;
                 MediaPreview.Visibility = Visibility.Collapsed;
-                Subtitle.Text = transaction.StarAmount.IsNegative()
+                Subtitle.Text = transaction.IsRefund
                     ? Strings.Gift2TransactionSent
                     : Strings.Gift2TransactionRefundedSent;
             }

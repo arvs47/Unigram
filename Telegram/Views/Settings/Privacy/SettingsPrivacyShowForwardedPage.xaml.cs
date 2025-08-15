@@ -73,13 +73,12 @@ namespace Telegram.Views.Settings.Privacy
                 var forwardInfo = new MessageForwardInfo(origin, 0, null, string.Empty);
                 var content = new MessageText(new FormattedText(Strings.PrivacyForwardsMessageLine, Array.Empty<TextEntity>()), null, null);
 
-                var message = new Message(0, new MessageSenderUser(user.Id), 0, null, null, false, false, false, false, false, false, false, DateTime.Now.ToTimestamp(), 0, forwardInfo, null, null, Array.Empty<UnreadReaction>(), null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, content, null);
+                var message = new Message(0, new MessageSenderUser(user.Id), 0, null, null, false, false, false, false, false, false, false, false, false, DateTime.Now.ToTimestamp(), 0, forwardInfo, null, null, Array.Empty<UnreadReaction>(), null, null, null, 0, null, null, 0, 0, 0, 0, 0, 0, string.Empty, 0, 0, false, string.Empty, content, null);
 
-                var playback = TypeResolver.Current.Playback;
                 var settings = TypeResolver.Current.Resolve<ISettingsService>(ViewModel.ClientService.SessionId);
 
                 var delegato = new ChatMessageDelegate(ViewModel.ClientService, settings, chat);
-                var viewModel = new MessageViewModel(ViewModel.ClientService, playback, delegato, chat, null, message, true);
+                var viewModel = new MessageViewModel(ViewModel.ClientService, delegato, chat, null, null, message, true);
 
                 MessagePreview.UpdateMessage(viewModel);
             }

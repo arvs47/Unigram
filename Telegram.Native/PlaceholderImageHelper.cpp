@@ -12,6 +12,7 @@
 #include <src\webp\demux.h>
 
 #include <shcore.h>
+#include <propkey.h>
 
 #include <winrt/Windows.ApplicationModel.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -20,8 +21,6 @@
 
 #include <BufferSurface.h>
 
-#define IFACEMETHODIMP2        __override COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE
-
 using namespace D2D1;
 using namespace winrt::Windows::ApplicationModel;
 using namespace winrt::Windows::UI::Xaml::Media::Imaging;
@@ -29,7 +28,8 @@ using namespace winrt::Windows::UI::Xaml::Media::Imaging;
 namespace winrt::Telegram::Native::implementation
 {
     std::mutex PlaceholderImageHelper::s_criticalSection;
-    winrt::com_ptr<PlaceholderImageHelper> PlaceholderImageHelper::s_current{ nullptr };
+    winrt::com_ptr<PlaceholderImageHelper> PlaceholderImageHelper::s_foreground{ nullptr };
+    winrt::com_ptr<PlaceholderImageHelper> PlaceholderImageHelper::s_background{ nullptr };
 
     class CustomEmojiInlineObject
         : public winrt::implements<CustomEmojiInlineObject, IDWriteInlineObject>
@@ -788,6 +788,8 @@ namespace winrt::Telegram::Native::implementation
         ReturnIfFailed(result, m_dwriteFactory->RegisterFontCollectionLoader(m_customLoader.get()));
         ReturnIfFailed(result, m_dwriteFactory->CreateCustomFontCollection(m_customLoader.get(), keys, keySize, m_fontCollection.put()));
         ReturnIfFailed(result, m_dwriteFactory->GetSystemFontCollection(m_systemCollection.put()));
+
+        return S_OK;
     }
 
     HRESULT PlaceholderImageHelper::CreateDeviceResources()
@@ -935,20 +937,13 @@ namespace winrt::Telegram::Native::implementation
 
     float2 PlaceholderImageHelper::ContentEnd(hstring text, IVector<TextEntity> entities, double fontSize, double width)
     {
-        float2 offset;
-        ContentEndImpl(text, entities, fontSize, width, offset);
-        return offset;
-    }
-
-    HRESULT PlaceholderImageHelper::ContentEndImpl(hstring text, IVector<TextEntity> entities, double fontSize, double width, float2& offset)
-    {
         std::lock_guard const guard(m_criticalSection);
         HRESULT result;
 
         //ReturnIfFailed(result, CreateTextFormat(fontSize));
 
         winrt::com_ptr<IDWriteTextFormat> textFormat;
-        ReturnIfFailed(result, m_dwriteFactory->CreateTextFormat(
+        ReturnDefaultIfFailed(result, m_dwriteFactory->CreateTextFormat(
             L"Segoe UI Emoji",						// font family name
             m_fontCollection.get(),			        // system font collection
             DWRITE_FONT_WEIGHT_NORMAL,				// font weight 
@@ -958,11 +953,11 @@ namespace winrt::Telegram::Native::implementation
             L"",									// locale name
             textFormat.put()
         ));
-        ReturnIfFailed(result, textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
-        ReturnIfFailed(result, textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
+        ReturnDefaultIfFailed(result, textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
+        ReturnDefaultIfFailed(result, textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
 
         winrt::com_ptr<IDWriteTextLayout> textLayout;
-        ReturnIfFailed(result, m_dwriteFactory->CreateTextLayout(
+        ReturnDefaultIfFailed(result, m_dwriteFactory->CreateTextLayout(
             text.data(),					// The string to be laid out and formatted.
             text.size(),        			// The length of the string.
             textFormat.get(),			    // The text format to apply to the string (contains font information, etc).
@@ -979,19 +974,19 @@ namespace winrt::Telegram::Native::implementation
 
             if (name == winrt::name_of<TextEntityTypeBold>())
             {
-                ReturnIfFailed(result, textLayout->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeItalic>())
             {
-                ReturnIfFailed(result, textLayout->SetFontStyle(DWRITE_FONT_STYLE_ITALIC, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontStyle(DWRITE_FONT_STYLE_ITALIC, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeStrikethrough>())
             {
-                ReturnIfFailed(result, textLayout->SetStrikethrough(TRUE, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetStrikethrough(TRUE, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeUnderline>())
             {
-                ReturnIfFailed(result, textLayout->SetUnderline(TRUE, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetUnderline(TRUE, { startPosition, length }));
             }
             //else if (name == winrt::name_of<TextEntityTypeCustomEmoji>())
             //{
@@ -999,38 +994,28 @@ namespace winrt::Telegram::Native::implementation
             //}
             else if (name == winrt::name_of<TextEntityTypeCode>() || name == winrt::name_of<TextEntityTypePre>() || name == winrt::name_of<TextEntityTypePreCode>())
             {
-                ReturnIfFailed(result, textLayout->SetFontCollection(m_systemCollection.get(), { startPosition, length }));
-                ReturnIfFailed(result, textLayout->SetFontFamilyName(L"Consolas", { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontCollection(m_systemCollection.get(), { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontFamilyName(L"Consolas", { startPosition, length }));
             }
         }
-        
+
         DWRITE_TEXT_METRICS metrics;
-        ReturnIfFailed(result, textLayout->GetMetrics(&metrics));
+        ReturnDefaultIfFailed(result, textLayout->GetMetrics(&metrics));
 
         BOOL isTrailingHit;
         BOOL isInside;
         DWRITE_HIT_TEST_METRICS hitTestMetrics;
-        ReturnIfFailed(result, textLayout->HitTestPoint(metrics.width, metrics.height, &isTrailingHit, &isInside, &hitTestMetrics));
+        ReturnDefaultIfFailed(result, textLayout->HitTestPoint(metrics.width, metrics.height, &isTrailingHit, &isInside, &hitTestMetrics));
 
-        offset = float2(hitTestMetrics.left + hitTestMetrics.width, hitTestMetrics.top + hitTestMetrics.height);
-        return result;
+        return float2(hitTestMetrics.left + hitTestMetrics.width, hitTestMetrics.top + hitTestMetrics.height);
     }
 
     IVector<Windows::Foundation::Rect> PlaceholderImageHelper::LineMetrics(hstring text, IVector<TextEntity> entities, double fontSize, double width, bool rtl)
     {
-        IVector<Windows::Foundation::Rect> rects;
-        RangeMetricsImpl(text, 0, text.size(), entities, fontSize, width, rtl, rects);
-        return rects;
+        return RangeMetrics(text, 0, text.size(), entities, fontSize, width, rtl, true);
     }
 
-    IVector<Windows::Foundation::Rect> PlaceholderImageHelper::RangeMetrics(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, bool rtl)
-    {
-        IVector<Windows::Foundation::Rect> rects;
-        RangeMetricsImpl(text, offset, length, entities, fontSize, width, rtl, rects);
-        return rects;
-    }
-
-    HRESULT PlaceholderImageHelper::RangeMetricsImpl(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, bool rtl, IVector<Windows::Foundation::Rect>& rects)
+    IVector<Windows::Foundation::Rect> PlaceholderImageHelper::RangeMetrics(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, bool rtl, bool wrap)
     {
         std::lock_guard const guard(m_criticalSection);
         HRESULT result;
@@ -1039,7 +1024,7 @@ namespace winrt::Telegram::Native::implementation
         //ReturnIfFailed(result, m_appleFormat->SetReadingDirection(rtl ? DWRITE_READING_DIRECTION_RIGHT_TO_LEFT : DWRITE_READING_DIRECTION_LEFT_TO_RIGHT));
 
         winrt::com_ptr<IDWriteTextFormat> textFormat;
-        ReturnIfFailed(result, m_dwriteFactory->CreateTextFormat(
+        ReturnDefaultIfFailed(result, m_dwriteFactory->CreateTextFormat(
             L"Segoe UI Emoji",						// font family name
             m_fontCollection.get(),			        // system font collection
             DWRITE_FONT_WEIGHT_NORMAL,				// font weight 
@@ -1049,12 +1034,24 @@ namespace winrt::Telegram::Native::implementation
             L"",									// locale name
             textFormat.put()
         ));
-        ReturnIfFailed(result, textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
-        ReturnIfFailed(result, textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
-        ReturnIfFailed(result, textFormat->SetReadingDirection(rtl ? DWRITE_READING_DIRECTION_RIGHT_TO_LEFT : DWRITE_READING_DIRECTION_LEFT_TO_RIGHT));
+        ReturnDefaultIfFailed(result, textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
+        ReturnDefaultIfFailed(result, textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
+        ReturnDefaultIfFailed(result, textFormat->SetReadingDirection(rtl ? DWRITE_READING_DIRECTION_RIGHT_TO_LEFT : DWRITE_READING_DIRECTION_LEFT_TO_RIGHT));
+        ReturnDefaultIfFailed(result, textFormat->SetWordWrapping(wrap ? DWRITE_WORD_WRAPPING_WRAP : DWRITE_WORD_WRAPPING_NO_WRAP));
+
+        if (wrap)
+        {
+            ReturnDefaultIfFailed(result, textFormat->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP));
+        }
+        else
+        {
+            //DWRITE_TRIMMING trimming = { DWRITE_TRIMMING_GRANULARITY_CHARACTER, '.', 3};
+            //ReturnIfFailed(result, textFormat->SetTrimming(&trimming, nullptr));
+            ReturnDefaultIfFailed(result, textFormat->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP));
+        }
 
         winrt::com_ptr<IDWriteTextLayout> textLayout;
-        ReturnIfFailed(result, m_dwriteFactory->CreateTextLayout(
+        ReturnDefaultIfFailed(result, m_dwriteFactory->CreateTextLayout(
             text.data(),					// The string to be laid out and formatted.
             text.size(),        			// The length of the string.
             textFormat.get(),			    // The text format to apply to the string (contains font information, etc).
@@ -1071,33 +1068,33 @@ namespace winrt::Telegram::Native::implementation
 
             if (name == winrt::name_of<TextEntityTypeBold>())
             {
-                ReturnIfFailed(result, textLayout->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeItalic>())
             {
-                ReturnIfFailed(result, textLayout->SetFontStyle(DWRITE_FONT_STYLE_ITALIC, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontStyle(DWRITE_FONT_STYLE_ITALIC, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeStrikethrough>())
             {
-                ReturnIfFailed(result, textLayout->SetStrikethrough(TRUE, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetStrikethrough(TRUE, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeUnderline>())
             {
-                ReturnIfFailed(result, textLayout->SetUnderline(TRUE, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetUnderline(TRUE, { startPosition, length }));
             }
             //else if (name == winrt::name_of<TextEntityTypeCustomEmoji>())
             //{
             //    textLayout->SetInlineObject(m_customEmoji.get(), { startPosition, length });
             //}
-            else if (name == winrt::name_of<TextEntityTypeCode>() ||  name == winrt::name_of<TextEntityTypePre>() || name == winrt::name_of<TextEntityTypePreCode>())
+            else if (name == winrt::name_of<TextEntityTypeCode>() || name == winrt::name_of<TextEntityTypePre>() || name == winrt::name_of<TextEntityTypePreCode>())
             {
-                ReturnIfFailed(result, textLayout->SetFontCollection(m_systemCollection.get(), { startPosition, length }));
-                ReturnIfFailed(result, textLayout->SetFontFamilyName(L"Consolas", { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontCollection(m_systemCollection.get(), { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontFamilyName(L"Consolas", { startPosition, length }));
             }
         }
 
         DWRITE_TEXT_METRICS metrics;
-        ReturnIfFailed(result, textLayout->GetMetrics(&metrics));
+        ReturnDefaultIfFailed(result, textLayout->GetMetrics(&metrics));
 
         UINT32 maxHitTestMetricsCount = metrics.lineCount * metrics.maxBidiReorderingDepth;
         UINT32 actualTestsCount;
@@ -1112,7 +1109,7 @@ namespace winrt::Telegram::Native::implementation
             result = textLayout->HitTestTextRange(offset, length, 0, 0, ranges, actualTestsCount, &actualTestsCount);
         }
 
-        ReturnIfFailed(result, result);
+        ReturnDefaultIfFailed(result, result);
 
         std::vector<Windows::Foundation::Rect> vector;
 
@@ -1127,17 +1124,10 @@ namespace winrt::Telegram::Native::implementation
         }
 
         delete[] ranges;
-        rects = winrt::single_threaded_vector<Windows::Foundation::Rect>(std::move(vector));
+        return winrt::single_threaded_vector<Windows::Foundation::Rect>(std::move(vector));
     }
 
-    int32_t PlaceholderImageHelper::TrimMetrics(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, double height, bool rtl)
-    {
-        int32_t output;
-        TrimMetricsImpl(text, offset, length, entities, fontSize, width, height, rtl, output);
-        return output;
-    }
-
-    HRESULT PlaceholderImageHelper::TrimMetricsImpl(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, double height, bool rtl, int32_t& output)
+    Windows::Foundation::Rect PlaceholderImageHelper::LayoutMetrics(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, bool rtl)
     {
         std::lock_guard const guard(m_criticalSection);
         HRESULT result;
@@ -1146,7 +1136,7 @@ namespace winrt::Telegram::Native::implementation
         //ReturnIfFailed(result, m_appleFormat->SetReadingDirection(rtl ? DWRITE_READING_DIRECTION_RIGHT_TO_LEFT : DWRITE_READING_DIRECTION_LEFT_TO_RIGHT));
 
         winrt::com_ptr<IDWriteTextFormat> textFormat;
-        ReturnIfFailed(result, m_dwriteFactory->CreateTextFormat(
+        ReturnDefaultIfFailed(result, m_dwriteFactory->CreateTextFormat(
             L"Segoe UI Emoji",						// font family name
             m_fontCollection.get(),			        // system font collection
             DWRITE_FONT_WEIGHT_NORMAL,				// font weight 
@@ -1156,22 +1146,20 @@ namespace winrt::Telegram::Native::implementation
             L"",									// locale name
             textFormat.put()
         ));
-        ReturnIfFailed(result, textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
-        ReturnIfFailed(result, textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
-        ReturnIfFailed(result, textFormat->SetReadingDirection(rtl ? DWRITE_READING_DIRECTION_RIGHT_TO_LEFT : DWRITE_READING_DIRECTION_LEFT_TO_RIGHT));
+        ReturnDefaultIfFailed(result, textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING));
+        ReturnDefaultIfFailed(result, textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR));
+        ReturnDefaultIfFailed(result, textFormat->SetReadingDirection(rtl ? DWRITE_READING_DIRECTION_RIGHT_TO_LEFT : DWRITE_READING_DIRECTION_LEFT_TO_RIGHT));
+        //ReturnDefaultIfFailed(result, textFormat->SetWordWrapping(wrap ? DWRITE_WORD_WRAPPING_WRAP : DWRITE_WORD_WRAPPING_NO_WRAP));
 
         winrt::com_ptr<IDWriteTextLayout> textLayout;
-        ReturnIfFailed(result, m_dwriteFactory->CreateTextLayout(
+        ReturnDefaultIfFailed(result, m_dwriteFactory->CreateTextLayout(
             text.data(),					// The string to be laid out and formatted.
             text.size(),        			// The length of the string.
             textFormat.get(),			    // The text format to apply to the string (contains font information, etc).
             width,							// The width of the layout box.
-            height, 						// The height of the layout box.
+            INFINITY,						// The height of the layout box.
             textLayout.put()				// The IDWriteTextLayout interface pointer.
         ));
-
-        DWRITE_TRIMMING trimmingOpt = { DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0 };
-        ReturnIfFailed(result, textLayout->SetTrimming(&trimmingOpt, NULL));
 
         for (const TextEntity& entity : entities)
         {
@@ -1181,19 +1169,19 @@ namespace winrt::Telegram::Native::implementation
 
             if (name == winrt::name_of<TextEntityTypeBold>())
             {
-                ReturnIfFailed(result, textLayout->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontWeight(DWRITE_FONT_WEIGHT_SEMI_BOLD, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeItalic>())
             {
-                ReturnIfFailed(result, textLayout->SetFontStyle(DWRITE_FONT_STYLE_ITALIC, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontStyle(DWRITE_FONT_STYLE_ITALIC, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeStrikethrough>())
             {
-                ReturnIfFailed(result, textLayout->SetStrikethrough(TRUE, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetStrikethrough(TRUE, { startPosition, length }));
             }
             else if (name == winrt::name_of<TextEntityTypeUnderline>())
             {
-                ReturnIfFailed(result, textLayout->SetUnderline(TRUE, { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetUnderline(TRUE, { startPosition, length }));
             }
             //else if (name == winrt::name_of<TextEntityTypeCustomEmoji>())
             //{
@@ -1201,17 +1189,15 @@ namespace winrt::Telegram::Native::implementation
             //}
             else if (name == winrt::name_of<TextEntityTypeCode>() || name == winrt::name_of<TextEntityTypePre>() || name == winrt::name_of<TextEntityTypePreCode>())
             {
-                ReturnIfFailed(result, textLayout->SetFontCollection(m_systemCollection.get(), { startPosition, length }));
-                ReturnIfFailed(result, textLayout->SetFontFamilyName(L"Consolas", { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontCollection(m_systemCollection.get(), { startPosition, length }));
+                ReturnDefaultIfFailed(result, textLayout->SetFontFamilyName(L"Consolas", { startPosition, length }));
             }
         }
 
-        BOOL isTrailingHit;
-        BOOL isInside;
-        DWRITE_HIT_TEST_METRICS metrics;
-        textLayout->HitTestPoint(width, height, &isTrailingHit, &isInside, &metrics);
+        DWRITE_TEXT_METRICS metrics;
+        ReturnDefaultIfFailed(result, textLayout->GetMetrics(&metrics));
 
-        return 0;
+        return { metrics.left, metrics.top, metrics.width, metrics.height };
     }
 
     HRESULT PlaceholderImageHelper::WriteBytes(IVector<byte> hash, IRandomAccessStream randomAccessStream) noexcept
@@ -1224,9 +1210,385 @@ namespace winrt::Telegram::Native::implementation
 
         ReturnIfFailed(result, stream->Write(yolo.data(), hash.Size(), nullptr));
         ReturnIfFailed(result, stream->Seek({ 0 }, STREAM_SEEK_SET, nullptr));
+
+        return S_OK;
     }
 
-    HRESULT PlaceholderImageHelper::Encode(IBuffer source, IRandomAccessStream destination, int32_t width, int32_t height)
+    CompositionPath PlaceholderImageHelper::GetTail(float width, float height, float topLeftRadius, float topRightRadius, float bottomRightRadius, float bottomLeftRadius)
+    {
+        std::lock_guard const guard(m_criticalSection);
+        HRESULT result;
+
+        winrt::com_ptr<ID2D1GeometrySink> d2dGeometrySink;
+        winrt::com_ptr<ID2D1PathGeometry1> d2dPathGeometry;
+
+        ReturnNullIfFailed(result, m_d2dFactory->CreatePathGeometry(d2dPathGeometry.put()));
+        ReturnNullIfFailed(result, d2dPathGeometry->Open(d2dGeometrySink.put()));
+
+        d2dGeometrySink->BeginFigure({ topLeftRadius, 0 }, D2D1_FIGURE_BEGIN_FILLED);
+
+        // Top edge
+        d2dGeometrySink->AddLine({ width - topRightRadius, 0 });
+
+        // Top-right corner
+        if (topRightRadius > 0)
+            d2dGeometrySink->AddArc({ {width, topRightRadius}, {topRightRadius, topRightRadius}, 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL });
+
+        // Right edge
+        d2dGeometrySink->AddLine({ width, height - (bottomRightRadius > 0 ? bottomRightRadius : 15) });
+
+        auto xshift = width - 30;
+        auto yshift = height - 30;
+
+        // Bottom-right corner
+        if (bottomRightRadius > 0)
+        {
+            d2dGeometrySink->AddArc({ { width - bottomRightRadius, height }, { bottomRightRadius, bottomRightRadius}, 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL });
+        }
+        else
+        {
+            d2dGeometrySink->AddBezier({ { xshift + 30.f, yshift + 15.f }, { xshift + 30.f, yshift + 18.493f }, { xshift + 28.796f, yshift + 21.704f } });
+            d2dGeometrySink->AddBezier({ { xshift + 26.802f, yshift + 24.259f }, { xshift + 26.802f, yshift + 27.222f }, { xshift + 29.444f, yshift + 28.889f } });
+            d2dGeometrySink->AddBezier({ { xshift + 29.833f, yshift + 29.167f }, { xshift + 30.f, yshift + 29.444f }, { xshift + 29.815f, yshift + 29.815f } });
+            d2dGeometrySink->AddBezier({ { xshift + 29.444f, yshift + 29.815f }, { xshift + 25.463f, yshift + 29.815f }, { xshift + 24.630f, yshift + 29.815f } });
+            d2dGeometrySink->AddBezier({ { xshift + 21.667f, yshift + 28.444f }, { xshift + 19.630f, yshift + 29.444f }, { xshift + 17.407f, yshift + 30.f } });
+        }
+
+        // Bottom edge
+        d2dGeometrySink->AddLine({ bottomLeftRadius > 0 ? bottomLeftRadius : 15, height });
+
+        // Bottom-left corner
+        if (bottomLeftRadius > 0)
+        {
+            d2dGeometrySink->AddArc({ { 0, height - bottomLeftRadius }, { bottomLeftRadius, bottomLeftRadius }, 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL });
+        }
+        else
+        {
+            d2dGeometrySink->AddBezier({ { 12.593f, yshift + 30.f }, { 10.370f, yshift + 29.444f }, { 8.333f, yshift + 28.444f } });
+            d2dGeometrySink->AddBezier({ { 5.370f, yshift + 29.815f }, { 4.537f, yshift + 29.815f }, { 0.556f, yshift + 29.815f } });
+            d2dGeometrySink->AddBezier({ { 0.185f, yshift + 29.815f }, { 0.f, yshift + 29.444f }, { 0.167f, yshift + 29.167f } });
+            d2dGeometrySink->AddBezier({ { 0.556f, yshift + 28.889f }, { 3.198f, yshift + 27.222f }, { 3.198f, yshift + 24.259f } });
+            d2dGeometrySink->AddBezier({ { 1.204f, yshift + 21.704f }, { 0.f, yshift + 18.493f }, { 0.f, yshift + 15.f } });
+        }
+
+        // Left edge
+        d2dGeometrySink->AddLine({ 0, topLeftRadius });
+
+        // Top-left corner
+        if (topLeftRadius > 0)
+            d2dGeometrySink->AddArc({ { topLeftRadius, 0 }, { topLeftRadius, topLeftRadius }, 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL });
+
+        d2dGeometrySink->EndFigure(D2D1_FIGURE_END_CLOSED);
+
+        ReturnNullIfFailed(result, d2dGeometrySink->Close());
+
+        auto geometry = winrt::make_self<CompositionPathSource>(d2dPathGeometry);
+        return CompositionPath(geometry.as<winrt::Windows::Graphics::IGeometrySource2D>());
+    }
+
+    CompositionPath PlaceholderImageHelper::GetOutline(IVector<ClosedVectorPath> contours)
+    {
+        std::lock_guard const guard(m_criticalSection);
+        HRESULT result;
+
+        winrt::com_ptr<ID2D1GeometrySink> d2dGeometrySink;
+        winrt::com_ptr<ID2D1PathGeometry1> d2dPathGeometry;
+
+        ReturnNullIfFailed(result, m_d2dFactory->CreatePathGeometry(d2dPathGeometry.put()));
+        ReturnNullIfFailed(result, d2dPathGeometry->Open(d2dGeometrySink.put()));
+
+        for (const ClosedVectorPath& path : contours)
+        {
+            bool open = true;
+            VectorPathCommandCubicBezierCurve endCurve{ nullptr };
+
+            for (const VectorPathCommand& command : path.Commands())
+            {
+                if (auto line = command.try_as<VectorPathCommandLine>())
+                {
+                    auto endPoint = line.EndPoint();
+                    if (open)
+                    {
+                        open = false;
+                        d2dGeometrySink->BeginFigure({ (float)endPoint.X(), (float)endPoint.Y() }, D2D1_FIGURE_BEGIN_FILLED);
+                    }
+                    else
+                    {
+                        d2dGeometrySink->AddLine({ (float)endPoint.X(), (float)endPoint.Y() });
+                    }
+                }
+                else if (auto cubicBezierCurve = command.try_as<VectorPathCommandCubicBezierCurve>())
+                {
+                    auto endPoint = cubicBezierCurve.EndPoint();
+
+                    if (open)
+                    {
+                        open = false;
+                        d2dGeometrySink->BeginFigure({ (float)endPoint.X(), (float)endPoint.Y() }, D2D1_FIGURE_BEGIN_FILLED);
+                        endCurve = cubicBezierCurve;
+                    }
+                    else
+                    {
+                        auto controlPoint1 = cubicBezierCurve.StartControlPoint();
+                        auto controlPoint2 = cubicBezierCurve.EndControlPoint();
+
+                        d2dGeometrySink->AddBezier({
+                            { (float)controlPoint1.X(), (float)controlPoint1.Y() },
+                            { (float)controlPoint2.X(), (float)controlPoint2.Y() },
+                            { (float)endPoint.X(), (float)endPoint.Y() }
+                            });
+                    }
+                }
+            }
+
+            if (endCurve)
+            {
+                auto endPoint = endCurve.EndPoint();
+                auto controlPoint1 = endCurve.StartControlPoint();
+                auto controlPoint2 = endCurve.EndControlPoint();
+
+                d2dGeometrySink->AddBezier({
+                    { (float)controlPoint1.X(), (float)controlPoint1.Y() },
+                    { (float)controlPoint2.X(), (float)controlPoint2.Y() },
+                    { (float)endPoint.X(), (float)endPoint.Y() }
+                    });
+            }
+
+            d2dGeometrySink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        }
+
+        ReturnNullIfFailed(result, d2dGeometrySink->Close());
+
+        auto geometry = winrt::make_self<CompositionPathSource>(d2dPathGeometry);
+        return CompositionPath(geometry.as<winrt::Windows::Graphics::IGeometrySource2D>());
+    }
+
+    CompositionPath PlaceholderImageHelper::GetEllipticalClip(float width, float height, float radius, float x, float y)
+    {
+        std::lock_guard const guard(m_criticalSection);
+        HRESULT result;
+
+        winrt::com_ptr<ID2D1GeometrySink> d2dGeometrySink;
+        winrt::com_ptr<ID2D1PathGeometry1> d2dPathGeometry;
+
+        ReturnNullIfFailed(result, m_d2dFactory->CreatePathGeometry(d2dPathGeometry.put()));
+        ReturnNullIfFailed(result, d2dPathGeometry->Open(d2dGeometrySink.put()));
+
+        d2dGeometrySink->SetFillMode(D2D1_FILL_MODE_ALTERNATE);
+        d2dGeometrySink->BeginFigure({ 0, 0 }, D2D1_FIGURE_BEGIN_FILLED);
+        d2dGeometrySink->AddLine({ width, 0 });
+        d2dGeometrySink->AddLine({ width, height });
+        d2dGeometrySink->AddLine({ 0, height });
+        d2dGeometrySink->EndFigure(D2D1_FIGURE_END_CLOSED);
+
+        D2D1_POINT_2F startPoint = D2D1::Point2F(x + radius, y);
+        D2D1_SIZE_F radii = D2D1::SizeF(radius, radius);
+
+        d2dGeometrySink->BeginFigure(startPoint, D2D1_FIGURE_BEGIN_FILLED);
+        d2dGeometrySink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(x - radius, y),
+            radii,
+            0.0f,
+            D2D1_SWEEP_DIRECTION_CLOCKWISE,
+            D2D1_ARC_SIZE_SMALL
+        ));
+        d2dGeometrySink->AddArc(D2D1::ArcSegment(
+            startPoint,
+            radii,
+            0.0f,
+            D2D1_SWEEP_DIRECTION_CLOCKWISE,
+            D2D1_ARC_SIZE_SMALL
+        ));
+        d2dGeometrySink->EndFigure(D2D1_FIGURE_END_CLOSED);
+
+        ReturnNullIfFailed(result, d2dGeometrySink->Close());
+
+        auto geometry = winrt::make_self<CompositionPathSource>(d2dPathGeometry);
+        return CompositionPath(geometry.as<winrt::Windows::Graphics::IGeometrySource2D>());
+    }
+
+    inline void AppendButton(winrt::com_ptr<ID2D1GeometrySink> d2dGeometrySink, float x, float y, float width, float height, float topLeftRadius, float topRightRadius, float bottomRightRadius, float bottomLeftRadius)
+    {
+        d2dGeometrySink->BeginFigure({ x + topLeftRadius, y }, D2D1_FIGURE_BEGIN_FILLED);
+
+        // Top edge
+        d2dGeometrySink->AddLine({ x + width - topRightRadius, y });
+
+        // Top-right corner
+        if (topRightRadius > 0)
+            d2dGeometrySink->AddArc({ { x + width, y + topRightRadius }, { topRightRadius, topRightRadius }, 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL });
+
+        // Right edge
+        d2dGeometrySink->AddLine({ x + width, y + height - bottomRightRadius });
+
+        // Bottom-right corner
+        if (bottomRightRadius > 0)
+            d2dGeometrySink->AddArc({ { x + width - bottomRightRadius, y + height }, { bottomRightRadius, bottomRightRadius }, 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL });
+
+        // Bottom edge
+        d2dGeometrySink->AddLine({ x + bottomLeftRadius, y + height });
+
+        // Bottom-left corner
+        if (bottomLeftRadius > 0)
+            d2dGeometrySink->AddArc({ { x, y + height - bottomLeftRadius }, { bottomLeftRadius, bottomLeftRadius }, 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL });
+
+        // Left edge
+        d2dGeometrySink->AddLine({ x, y + topLeftRadius });
+
+        // Top-left corner
+        if (topLeftRadius > 0)
+            d2dGeometrySink->AddArc({ { x + topLeftRadius, y }, { topLeftRadius, topLeftRadius }, 0, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL });
+
+        d2dGeometrySink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    }
+
+    CompositionPath PlaceholderImageHelper::GetReplyMarkupClip(IVector<IVector<Windows::Foundation::Rect>> rows, float bottomRightRadius, float bottomLeftRadius)
+    {
+        std::lock_guard const guard(m_criticalSection);
+        HRESULT result;
+
+        winrt::com_ptr<ID2D1GeometrySink> d2dGeometrySink;
+        winrt::com_ptr<ID2D1PathGeometry1> d2dPathGeometry;
+
+        ReturnNullIfFailed(result, m_d2dFactory->CreatePathGeometry(d2dPathGeometry.put()));
+        ReturnNullIfFailed(result, d2dPathGeometry->Open(d2dGeometrySink.put()));
+
+        auto padding = 2;
+        auto x = 0.f;
+        auto y = 0.f;
+
+        auto j = 0;
+
+        for (const IVector<Windows::Foundation::Rect>& row : rows)
+        {
+            auto i = 0;
+
+            for (const Windows::Foundation::Rect& button : row)
+            {
+                auto bottomRight = 4.f;
+                auto bottomLeft = 4.f;
+
+                if (j == rows.Size() - 1)
+                {
+                    if (i == 0)
+                    {
+                        bottomLeft = bottomLeftRadius;
+                    }
+
+                    if (i == row.Size() - 1)
+                    {
+                        bottomRight = bottomRightRadius;
+                    }
+                }
+
+                AppendButton(d2dGeometrySink, button.X, button.Y, button.Width, button.Height, 4, 4, bottomRight, bottomLeft);
+
+                i++;
+            }
+
+            j++;
+        }
+
+        ReturnNullIfFailed(result, d2dGeometrySink->Close());
+
+        auto geometry = winrt::make_self<CompositionPathSource>(d2dPathGeometry);
+        return CompositionPath(geometry.as<winrt::Windows::Graphics::IGeometrySource2D>());
+    }
+
+    CompositionPath PlaceholderImageHelper::GetVoiceNoteClip(IVector<byte> waveform, double waveformWidth)
+    {
+        std::lock_guard const guard(m_criticalSection);
+        HRESULT result;
+
+        winrt::com_ptr<ID2D1GeometrySink> d2dGeometrySink;
+        winrt::com_ptr<ID2D1PathGeometry1> d2dPathGeometry;
+
+        ReturnNullIfFailed(result, m_d2dFactory->CreatePathGeometry(d2dPathGeometry.put()));
+        ReturnNullIfFailed(result, d2dPathGeometry->Open(d2dGeometrySink.put()));
+
+        auto lines = waveform.Size() * 8 / 5;
+        auto bytes = new double[lines];
+
+        for (int i = 0; i < lines; i++)
+        {
+            int j = (i * 5) / 8, shift = (i * 5) % 8;
+            bytes[i] = ((waveform.GetAt(j) | ((j + 1 < waveform.Size() ? waveform.GetAt(j + 1) : 0) << 8)) >> shift & 0x1F) / 31.0;
+        }
+
+        auto imageWidth = waveformWidth; // 142d; // double.IsNaN(ActualWidth) ? 142 : ActualWidth;
+        auto imageHeight = 20;
+
+        auto space = 1.0;
+        auto lineWidth = 2.0;
+        auto maxLines = (imageWidth - space) / (lineWidth + space);
+        auto maxWidth = lines / maxLines;
+
+        for (int index = 0; index < maxLines; index++)
+        {
+            auto lineIndex = (int)(index * maxWidth);
+            auto lineHeight = bytes[lineIndex] * (double)(imageHeight - 2.0) + 2.0;
+
+            float x1 = (int)(index * (lineWidth + space));
+            float y1 = (imageHeight - (int)lineHeight) / 2;
+            float x2 = (int)(index * (lineWidth + space) + lineWidth);
+            float y2 = imageHeight - y1;
+
+            //d2dGeometrySink->BeginFigure({ x1, y1 }, D2D1_FIGURE_BEGIN_FILLED);
+            //d2dGeometrySink->AddLine({ x2, y1 });
+            //d2dGeometrySink->AddLine({ x2, y2 });
+            //d2dGeometrySink->AddLine({ x1, y2 });
+            //d2dGeometrySink->EndFigure(D2D1_FIGURE_END_CLOSED);
+
+            if (lineHeight > 2)
+            {
+                d2dGeometrySink->BeginFigure({ x1, y1 + 1 }, D2D1_FIGURE_BEGIN_FILLED);
+                d2dGeometrySink->AddArc(D2D1::ArcSegment(
+                    D2D1::Point2F(x2, y1 + 1),
+                    D2D1::SizeF(1, 1),
+                    0.0f,
+                    D2D1_SWEEP_DIRECTION_CLOCKWISE,
+                    D2D1_ARC_SIZE_SMALL
+                ));
+                d2dGeometrySink->AddLine({ x2, y2 - 1 });
+                d2dGeometrySink->AddArc(D2D1::ArcSegment(
+                    { x1, y2 - 1 },
+                    D2D1::SizeF(1, 1),
+                    0.0f,
+                    D2D1_SWEEP_DIRECTION_CLOCKWISE,
+                    D2D1_ARC_SIZE_SMALL
+                ));
+            }
+            else
+            {
+                d2dGeometrySink->BeginFigure({ x1, 10 }, D2D1_FIGURE_BEGIN_FILLED);
+                d2dGeometrySink->AddArc(D2D1::ArcSegment(
+                    D2D1::Point2F(x2, 10),
+                    D2D1::SizeF(1, 1),
+                    0.0f,
+                    D2D1_SWEEP_DIRECTION_CLOCKWISE,
+                    D2D1_ARC_SIZE_SMALL
+                ));
+                d2dGeometrySink->AddArc(D2D1::ArcSegment(
+                    { x1, 10 },
+                    D2D1::SizeF(1, 1),
+                    0.0f,
+                    D2D1_SWEEP_DIRECTION_CLOCKWISE,
+                    D2D1_ARC_SIZE_SMALL
+                ));
+            }
+
+            d2dGeometrySink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        }
+
+        delete[] bytes;
+
+        ReturnNullIfFailed(result, d2dGeometrySink->Close());
+
+        auto geometry = winrt::make_self<CompositionPathSource>(d2dPathGeometry);
+        return CompositionPath(geometry.as<winrt::Windows::Graphics::IGeometrySource2D>());
+    }
+
+    HRESULT PlaceholderImageHelper::Encode(IBuffer source, IRandomAccessStream destination, int32_t width, int32_t height, int32_t rotation)
     {
         HRESULT result;
         winrt::com_ptr<IStream> stream;
@@ -1248,6 +1610,35 @@ namespace winrt::Telegram::Native::implementation
         WICPixelFormatGUID pixelFormat = GUID_WICPixelFormat32bppBGRA;
         ReturnIfFailed(result, wicFrameEncode->SetSize(width, height));
         ReturnIfFailed(result, wicFrameEncode->SetPixelFormat(&pixelFormat));
+
+        if (rotation)
+        {
+            winrt::com_ptr<IWICMetadataQueryWriter> pMetadataWriter;
+            ReturnIfFailed(result, wicFrameEncode->GetMetadataQueryWriter(pMetadataWriter.put()));
+
+            PROPVARIANT propValue;
+            PropVariantInit(&propValue);
+            propValue.vt = VT_UI2;
+
+            switch (rotation)
+            {
+            case 90:
+                propValue.uiVal = PHOTO_ORIENTATION_ROTATE270;
+                break;
+            case 180:
+                propValue.uiVal = PHOTO_ORIENTATION_ROTATE180;
+                break;
+            case 270:
+                propValue.uiVal = PHOTO_ORIENTATION_ROTATE90;
+                break;
+            default:
+                propValue.uiVal = PHOTO_ORIENTATION_NORMAL;
+                break;
+            }
+
+            ReturnIfFailed(result, pMetadataWriter->SetMetadataByName(L"System.Photo.Orientation", &propValue));
+            PropVariantClear(&propValue);
+        }
 
         ReturnIfFailed(result, wicFrameEncode->WritePixels(height, width * 4, width * height * 4, source.data()));
         ReturnIfFailed(result, wicFrameEncode->Commit());

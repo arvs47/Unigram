@@ -128,7 +128,7 @@ namespace Telegram.Controls.Cells
         private TextBlock UnreadMentionsLabel;
         private Run FromLabel;
         private Run DraftLabel;
-        private RichTextBlock BriefText;
+        private FormattedTextBlock BriefText;
         private Span BriefLabel;
         private ImageBrush Minithumbnail;
         private Rectangle SelectionOutline;
@@ -138,7 +138,7 @@ namespace Telegram.Controls.Cells
         private Border OnlineHeart;
         private StackPanel Folders;
 
-        private BadgeControl FeedbackGroup;
+        private BadgeControl DirectMessagesGroup;
 
         private Border CompactBadgeRoot;
         private BadgeControl CompactBadge;
@@ -165,7 +165,7 @@ namespace Telegram.Controls.Cells
             UnreadMentionsLabel = GetTemplateChild(nameof(UnreadMentionsLabel)) as TextBlock;
             FromLabel = GetTemplateChild(nameof(FromLabel)) as Run;
             DraftLabel = GetTemplateChild(nameof(DraftLabel)) as Run;
-            BriefText = GetTemplateChild(nameof(BriefText)) as RichTextBlock;
+            BriefText = GetTemplateChild(nameof(BriefText)) as FormattedTextBlock;
             BriefLabel = GetTemplateChild(nameof(BriefLabel)) as Span;
             Minithumbnail = GetTemplateChild(nameof(Minithumbnail)) as ImageBrush;
             SelectionOutline = GetTemplateChild(nameof(SelectionOutline)) as Rectangle;
@@ -318,7 +318,7 @@ namespace Telegram.Controls.Cells
             UpdateChatTitle(chat);
             UpdateChatPhoto(chat);
             UpdateChatEmojiStatus(chat);
-            UpdateNotificationSettings(chat);
+            UpdateChatNotificationSettings(chat);
 
             PinnedIcon.Visibility = Visibility.Collapsed;
             UnreadBadge.Visibility = Visibility.Collapsed;
@@ -761,7 +761,7 @@ namespace Telegram.Controls.Cells
             }
         }
 
-        public void UpdateNotificationSettings(Chat chat)
+        public void UpdateChatNotificationSettings(Chat chat)
         {
             if (_clientService == null || !_templateApplied)
             {
@@ -822,20 +822,20 @@ namespace Telegram.Controls.Cells
                 verification = user.VerificationStatus?.BotVerificationIconCustomEmojiId;
                 Identity.SetStatus(_clientService, user, true);
 
-                UnloadObject(ref FeedbackGroup);
+                UnloadObject(ref DirectMessagesGroup);
             }
             else if (_clientService.TryGetSupergroup(chat, out Supergroup supergroup))
             {
                 verification = supergroup.VerificationStatus?.BotVerificationIconCustomEmojiId;
                 Identity.SetStatus(supergroup);
 
-                if (supergroup.IsFeedbackGroup)
+                if (supergroup.IsDirectMessagesGroup)
                 {
-                    LoadObject(ref FeedbackGroup, nameof(FeedbackGroup));
+                    LoadObject(ref DirectMessagesGroup, nameof(DirectMessagesGroup));
                 }
                 else
                 {
-                    UnloadObject(ref FeedbackGroup);
+                    UnloadObject(ref DirectMessagesGroup);
                 }
             }
             else
@@ -843,7 +843,7 @@ namespace Telegram.Controls.Cells
                 verification = null;
                 Identity.ClearStatus();
 
-                UnloadObject(ref FeedbackGroup);
+                UnloadObject(ref DirectMessagesGroup);
             }
 
             if (verification is not null and not 0)
@@ -1128,7 +1128,7 @@ namespace Telegram.Controls.Cells
             UpdateChatLastMessage(chat, position);
             //UpdateChatReadInbox(chat);
             UpdateChatUnreadMentionCount(chat, position, false);
-            UpdateNotificationSettings(chat);
+            UpdateChatNotificationSettings(chat);
             UpdateChatActions(chat, _clientService.GetChatActions(chat.Id));
 
             if (_clientService.TryGetUser(chat, out User user) && user.Type is UserTypeRegular && user.Id != _clientService.Options.MyId && user.Id != 777000)
@@ -1195,6 +1195,9 @@ namespace Telegram.Controls.Cells
                             TextLineBounds = TextLineBounds.Tight,
                             TextAlignment = TextAlignment.Center,
                             OpticalMarginAlignment = OpticalMarginAlignment.TrimSideBearings,
+                            TextWrapping = TextWrapping.Wrap,
+                            TextTrimming = TextTrimming.CharacterEllipsis,
+                            MaxLines = 1,
                             FontSize = 11,
                             Padding = new Thickness(4, 0, 4, 0),
                             VerticalAlignment = VerticalAlignment.Center,
@@ -1296,7 +1299,7 @@ namespace Telegram.Controls.Cells
             }
         }
 
-        private async void UpdateMinithumbnail(MinithumbnailId thumbnail)
+        private void UpdateMinithumbnail(MinithumbnailId thumbnail)
         {
             if (thumbnail != null)
             {
@@ -1331,7 +1334,7 @@ namespace Telegram.Controls.Cells
                     try
                     {
                         PlaceholderImageHelper.WriteBytes(thumbnail.Data, stream);
-                        await bitmap.SetSourceAsync(stream);
+                        _ = bitmap.SetSourceAsync(stream);
                     }
                     catch
                     {
@@ -1368,9 +1371,9 @@ namespace Telegram.Controls.Cells
                 }
             }
 
-            CustomEmojiIcon.Add(BriefText, BriefLabel.Inlines, _clientService, message, "InfoCustomEmojiStyle");
+            BriefText.SetText(_clientService, message);
+            BriefText.SetQuery(string.Empty);
         }
-
 
         private FormattedText UpdateBriefLabel(Chat chat, ChatPosition position, out MinithumbnailId thumbnail)
         {
@@ -1384,6 +1387,11 @@ namespace Telegram.Controls.Cells
             var topMessage = chat.LastMessage;
             if (topMessage != null)
             {
+                if (_clientService.TryGetMediaAlbum(chat.Id, topMessage.MediaAlbumId, out MessageAlbumLastMessage album))
+                {
+                    return UpdateBriefLabel(album, topMessage.IsOutgoing, chat.DraftMessage, false, out thumbnail);
+                }
+
                 return UpdateBriefLabel(topMessage.Content, topMessage.IsOutgoing, chat.DraftMessage, false, out thumbnail);
             }
             else if (chat.Type is ChatTypeSecret secretType)
@@ -1441,170 +1449,159 @@ namespace Telegram.Controls.Cells
                 return Text(text + fallback);
             }
 
-            if (content is MessageGame gameMedia)
+            switch (content)
             {
-                return Text("\U0001F3AE " + gameMedia.Game.Title);
-            }
-            else if (content is MessageVideoNote videoNote)
-            {
-                if (videoNote.VideoNote.Minithumbnail == null || videoNote.IsSecret || forceEmoji /*|| message.SelfDestructType is not null*/)
-                {
-                    return Text("\U0001F4F9 " + Strings.AttachRound);
-                }
-
-                thumbnail = new MinithumbnailId(videoNote.VideoNote.Video.Id, videoNote.VideoNote.Minithumbnail, true);
-                return Text(Strings.AttachRound);
-            }
-            else if (content is MessageSticker sticker)
-            {
-                if (string.IsNullOrEmpty(sticker.Sticker.Emoji))
-                {
-                    return Text(Strings.AttachSticker);
-                }
-
-                return Text($"{sticker.Sticker.Emoji} {Strings.AttachSticker}");
-            }
-            else if (content is MessageVoiceNote voiceNote)
-            {
-                return Text1("\U0001F3A4 ", voiceNote.Caption, Strings.AttachAudio);
-            }
-            else if (content is MessageVideo video)
-            {
-                if ((video.Cover?.Minithumbnail == null && video.Video.Minithumbnail == null) || video.IsSecret || forceEmoji)
-                {
-                    return Text1("\U0001F4F9 ", video.Caption, Strings.AttachVideo);
-                }
-
-                if (video.Cover != null)
-                {
-                    thumbnail = new MinithumbnailId(video.Video.VideoValue.Id, video.Cover.Minithumbnail, false);
-                }
-                else
-                {
-                    thumbnail = new MinithumbnailId(video.Video.VideoValue.Id, video.Video.Minithumbnail, false);
-                }
-
-                return Text1(string.Empty, video.Caption, Strings.AttachVideo);
-            }
-            else if (content is MessageAnimation animation)
-            {
-                if (animation.Animation.Minithumbnail == null || animation.IsSecret || forceEmoji)
-                {
-                    return Text1("\U0001F47E ", animation.Caption, Strings.AttachGif);
-                }
-
-                thumbnail = new MinithumbnailId(animation.Animation.AnimationValue.Id, animation.Animation.Minithumbnail, false);
-                return Text1(string.Empty, animation.Caption, Strings.AttachGif);
-            }
-            else if (content is MessageAudio audio)
-            {
-                var performer = string.IsNullOrEmpty(audio.Audio.Performer) ? null : audio.Audio.Performer;
-                var title = string.IsNullOrEmpty(audio.Audio.Title) ? null : audio.Audio.Title;
-
-                if (performer == null && title == null)
-                {
-                    return Text1("\U0001F3B5 ", audio.Caption, audio.Audio.FileName);
-                }
-                else
-                {
-                    return Text1("\U0001F3B5 ", audio.Caption, $"{performer ?? Strings.AudioUnknownArtist} - {title ?? Strings.AudioUnknownTitle}");
-                }
-            }
-            else if (content is MessageDocument document)
-            {
-                if (string.IsNullOrEmpty(document.Document.FileName))
-                {
-                    return Text1("\U0001F4CE ", document.Caption, Strings.AttachDocument);
-                }
-
-                return Text1("\U0001F4CE ", document.Caption, document.Document.FileName);
-            }
-            else if (content is MessageInvoice invoice)
-            {
-                return Text1("\U0001F4CB ", invoice.PaidMediaCaption, invoice.ProductInfo.Title);
-            }
-            else if (content is MessageContact)
-            {
-                return Text("\U0001F464 " + Strings.AttachContact);
-            }
-            else if (content is MessageLocation location)
-            {
-                return Text("\U0001F4CD " + (location.LivePeriod > 0 ? Strings.AttachLiveLocation : Strings.AttachLocation));
-            }
-            else if (content is MessageVenue)
-            {
-                return Text("\U0001F4CD " + Strings.AttachLocation);
-            }
-            else if (content is MessagePhoto photo)
-            {
-                if (photo.Photo.Minithumbnail == null || photo.IsSecret || forceEmoji)
-                {
-                    return Text1("\U0001F5BC ", photo.Caption, Strings.AttachPhoto);
-                }
-
-                thumbnail = new MinithumbnailId(photo.Photo.Sizes[^1].Photo.Id, photo.Photo.Minithumbnail, false);
-                return Text1(string.Empty, photo.Caption, Strings.AttachPhoto);
-            }
-            else if (content is MessagePoll poll)
-            {
-                return Text1("\U0001F4CA ", poll.Poll.Question, Strings.Poll);
-            }
-            else if (content is MessageCall call)
-            {
-                return Text("\u260E " + call.ToOutcomeText(outgoing));
-            }
-            else if (content is MessageGroupCall groupCall)
-            {
-                return Text("\u260E " + groupCall.ToOutcomeText(outgoing));
-            }
-            else if (content is MessageStory story && !story.ViaMention)
-            {
-                return Text(Strings.Story);
-            }
-            else if (content is MessageUnsupported)
-            {
-                return Text(Strings.UnsupportedAttachment);
-            }
-            else if (content is MessageAnimatedEmoji animatedEmoji)
-            {
-                if (animatedEmoji.AnimatedEmoji?.Sticker?.FullType is StickerFullTypeCustomEmoji customEmoji)
-                {
-                    return new FormattedText(animatedEmoji.Emoji, new[]
+                case MessageGame gameMedia:
+                    return Text("\U0001F3AE " + gameMedia.Game.Title);
+                case MessageVideoNote videoNote:
+                    if (videoNote.VideoNote.Minithumbnail == null || videoNote.IsSecret || forceEmoji /*|| message.SelfDestructType is not null*/)
                     {
+                        return Text("\U0001F4F9 " + Strings.AttachRound);
+                    }
+
+                    thumbnail = new MinithumbnailId(videoNote.VideoNote.Video.Id, videoNote.VideoNote.Minithumbnail, true);
+                    return Text(Strings.AttachRound);
+                case MessageSticker sticker:
+                    if (string.IsNullOrEmpty(sticker.Sticker.Emoji))
+                    {
+                        return Text(Strings.AttachSticker);
+                    }
+
+                    return Text($"{sticker.Sticker.Emoji} {Strings.AttachSticker}");
+                case MessageVoiceNote voiceNote:
+                    return Text1("\U0001F3A4 ", voiceNote.Caption, Strings.AttachAudio);
+                case MessageVideo video:
+                    if (video.Cover?.Minithumbnail == null && video.Video.Minithumbnail == null || video.IsSecret || forceEmoji)
+                    {
+                        return Text1("\U0001F4F9 ", video.Caption, Strings.AttachVideo);
+                    }
+
+                    if (video.Cover != null)
+                    {
+                        thumbnail = new MinithumbnailId(video.Video.VideoValue.Id, video.Cover.Minithumbnail, false);
+                    }
+                    else
+                    {
+                        thumbnail = new MinithumbnailId(video.Video.VideoValue.Id, video.Video.Minithumbnail, false);
+                    }
+
+                    return Text1(string.Empty, video.Caption, Strings.AttachVideo);
+                case MessageAnimation animation:
+                    if (animation.Animation.Minithumbnail == null || animation.IsSecret || forceEmoji)
+                    {
+                        return Text1("\U0001F47E ", animation.Caption, Strings.AttachGif);
+                    }
+
+                    thumbnail = new MinithumbnailId(animation.Animation.AnimationValue.Id, animation.Animation.Minithumbnail, false);
+                    return Text1(string.Empty, animation.Caption, Strings.AttachGif);
+                case MessageAudio audio:
+                    return Text1("\U0001F3B5 ", audio.Caption, audio.Audio.GetTitle());
+                case MessageDocument document:
+                    if (string.IsNullOrEmpty(document.Document.FileName))
+                    {
+                        return Text1("\U0001F4CE ", document.Caption, Strings.AttachDocument);
+                    }
+
+                    return Text1("\U0001F4CE ", document.Caption, document.Document.FileName);
+                case MessageInvoice invoice:
+                    return Text1("\U0001F4CB ", invoice.PaidMediaCaption, invoice.ProductInfo.Title);
+                case MessageContact:
+                    return Text("\U0001F464 " + Strings.AttachContact);
+                case MessageLocation location:
+                    return Text("\U0001F4CD " + (location.LivePeriod > 0 ? Strings.AttachLiveLocation : Strings.AttachLocation));
+                case MessageVenue:
+                    return Text("\U0001F4CD " + Strings.AttachLocation);
+                case MessagePhoto photo:
+                    if (photo.Photo.Minithumbnail == null || photo.IsSecret || forceEmoji)
+                    {
+                        return Text1("\U0001F5BC ", photo.Caption, Strings.AttachPhoto);
+                    }
+
+                    thumbnail = new MinithumbnailId(photo.Photo.Sizes[^1].Photo.Id, photo.Photo.Minithumbnail, false);
+                    return Text1(string.Empty, photo.Caption, Strings.AttachPhoto);
+                case MessagePoll poll:
+                    return Text1("\U0001F4CA ", poll.Poll.Question, Strings.Poll);
+                case MessageChecklist checklist:
+                    return Text1("\u2611 ", checklist.List.Title, Strings.Todo);
+                case MessageCall call:
+                    return Text("\u260E " + call.ToOutcomeText(outgoing));
+                case MessageGroupCall groupCall:
+                    return Text("\u260E " + groupCall.ToOutcomeText(outgoing));
+                case MessageStory story when !story.ViaMention:
+                    return Text(Strings.Story);
+                case MessageUnsupported:
+                    return Text(Strings.UnsupportedAttachment);
+                case MessageAnimatedEmoji animatedEmoji:
+                    {
+                        if (animatedEmoji.AnimatedEmoji?.Sticker?.FullType is StickerFullTypeCustomEmoji customEmoji)
+                        {
+                            return new FormattedText(animatedEmoji.Emoji, new[]
+                            {
                         new TextEntity(0, animatedEmoji.Emoji.Length, new TextEntityTypeCustomEmoji(customEmoji.CustomEmojiId))
                     });
-                }
+                        }
 
-                return new FormattedText(animatedEmoji.Emoji, Array.Empty<TextEntity>());
-            }
-            else if (content is MessageGiveaway)
-            {
-                return Text(Strings.BoostingGiveaway);
-            }
-            else if (content is MessageGiveawayWinners)
-            {
-                return Text(Strings.BoostingGiveawayResults);
-            }
-            else if (content is MessagePaidMedia paidMedia)
-            {
-                if (paidMedia.Media.All(x => x.IsPhoto()))
-                {
-                    return Text1(Icons.Premium + "\u2004", paidMedia.Caption, paidMedia.Media.Count > 1 ? Locale.Declension(Strings.R.Photos, paidMedia.Media.Count) : Strings.AttachPhoto);
-                }
-                else if (paidMedia.Media.All(x => x.IsVideo()))
-                {
-                    return Text1(Icons.Premium + "\u2004", paidMedia.Caption, paidMedia.Media.Count > 1 ? Locale.Declension(Strings.R.Videos, paidMedia.Media.Count) : Strings.AttachVideo);
-                }
+                        return new FormattedText(animatedEmoji.Emoji, Array.Empty<TextEntity>());
+                    }
 
-                return Text1(Icons.Premium + "\u2004", paidMedia.Caption, Locale.Declension(Strings.R.Media, paidMedia.Media.Count));
-            }
+                case MessageGiveaway:
+                    return Text(Strings.BoostingGiveaway);
+                case MessageGiveawayWinners:
+                    return Text(Strings.BoostingGiveawayResults);
+                case MessagePaidMedia paidMedia:
+                    {
+                        if (paidMedia.Media.All(x => x.IsPhoto()))
+                        {
+                            return Text1(Icons.Premium + "\u2004", paidMedia.Caption, paidMedia.Media.Count > 1 ? Locale.Declension(Strings.R.Photos, paidMedia.Media.Count) : Strings.AttachPhoto);
+                        }
+                        else if (paidMedia.Media.All(x => x.IsVideo()))
+                        {
+                            return Text1(Icons.Premium + "\u2004", paidMedia.Caption, paidMedia.Media.Count > 1 ? Locale.Declension(Strings.R.Videos, paidMedia.Media.Count) : Strings.AttachVideo);
+                        }
 
-            return content switch
-            {
-                MessageText text => text.Text,
-                MessageDice dice => new FormattedText(dice.Emoji, Array.Empty<TextEntity>()),
-                _ => new FormattedText(string.Empty, Array.Empty<TextEntity>()),
-            };
+                        return Text1(Icons.Premium + "\u2004", paidMedia.Caption, Locale.Declension(Strings.R.Media, paidMedia.Media.Count));
+                    }
+
+                case MessageAlbumLastMessage album:
+                    {
+                        if (album.PhotosCount > 0 && album.VideosCount == 0)
+                        {
+                            if (album.LastMessage is MessagePhoto albumPhoto && albumPhoto.Photo.Minithumbnail != null)
+                            {
+                                thumbnail = new MinithumbnailId(albumPhoto.Photo.Sizes[^1].Photo.Id, albumPhoto.Photo.Minithumbnail, false);
+                                return Text1(string.Empty, album.Caption, album.PhotosCount > 1 ? Locale.Declension(Strings.R.Photos, album.PhotosCount) : Strings.AttachPhoto);
+                            }
+
+                            return Text1("\U0001F5BC ", album.Caption, album.PhotosCount > 1 ? Locale.Declension(Strings.R.Photos, album.PhotosCount) : Strings.AttachPhoto);
+                        }
+                        else if (album.VideosCount > 0 && album.PhotosCount == 0)
+                        {
+                            if (album.LastMessage is MessageVideo albumVideo && (albumVideo.Cover?.Minithumbnail != null || albumVideo.Video.Minithumbnail != null))
+                            {
+                                if (albumVideo.Cover != null)
+                                {
+                                    thumbnail = new MinithumbnailId(albumVideo.Video.VideoValue.Id, albumVideo.Cover.Minithumbnail, false);
+                                }
+                                else
+                                {
+                                    thumbnail = new MinithumbnailId(albumVideo.Video.VideoValue.Id, albumVideo.Video.Minithumbnail, false);
+                                }
+
+                                return Text1(string.Empty, album.Caption, album.VideosCount > 1 ? Locale.Declension(Strings.R.Videos, album.VideosCount) : Strings.AttachVideo);
+                            }
+
+                            return Text1("\U0001F4F9 ", album.Caption, album.VideosCount > 1 ? Locale.Declension(Strings.R.Videos, album.VideosCount) : Strings.AttachVideo);
+                        }
+
+                        return Text1("\U0001F5BC ", album.Caption, Locale.Declension(Strings.R.Media, album.PhotosCount + album.VideosCount));
+                    }
+                case MessageText text:
+                    return text.Text;
+                case MessageDice dice:
+                    return dice.Emoji.AsFormattedText();
+                default:
+                    return string.Empty.AsFormattedText();
+            }
         }
 
         private string UpdateFromLabel(Chat chat, ChatPosition position, out bool draft)
@@ -1639,14 +1636,14 @@ namespace Telegram.Controls.Cells
 
         public static string UpdateFromLabel(IClientService clientService, Chat chat, Message message)
         {
-            if (message.IsService())
+            if (message.Content.IsService())
             {
-                if (chat == null && clientService.TryGetChat(message.ChatId, out chat))
+                if (chat == null)
                 {
                     clientService.TryGetChat(message.ChatId, out chat);
                 }
 
-                return MessageService.GetText(new MessageViewModel(clientService, null, null, chat, null, message));
+                return MessageService.GetText(new MessageViewModel(clientService, null, chat, null, null, message));
             }
 
             var format = "{0}: \u200B";
@@ -1675,7 +1672,7 @@ namespace Telegram.Controls.Cells
                     }
                     else if (message.ImportInfo != null)
                     {
-                        return string.Format(format, message.ImportInfo);
+                        return string.Format(format, message.ImportInfo.SenderName);
                     }
                 }
 
@@ -1719,7 +1716,7 @@ namespace Telegram.Controls.Cells
             senderUser = null;
             senderChat = null;
 
-            if (message.IsService())
+            if (message.Content.IsService())
             {
                 return false;
             }

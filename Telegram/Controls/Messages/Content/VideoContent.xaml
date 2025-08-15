@@ -24,8 +24,7 @@
                 <ControlTemplate TargetType="local:VideoContent">
                     <controls:AspectView x:Name="LayoutRoot"
                                          Background="Black">
-                        <Image x:Name="Texture"
-                               Stretch="UniformToFill" />
+                        <Border x:Name="Texture" />
 
                         <controls:AnimatedImage x:Name="Particles"
                                                 IsViewportAware="True"
@@ -56,6 +55,11 @@
                                        TextWrapping="NoWrap"
                                        Typography.NumeralAlignment="Tabular" />
                         </controls:FileButton>
+
+                        <ProgressBar x:Name="Indicator"
+                                     VerticalAlignment="Bottom"
+                                     Visibility="Collapsed"
+                                     MinHeight="2" />
                     </controls:AspectView>
                 </ControlTemplate>
             </Setter.Value>

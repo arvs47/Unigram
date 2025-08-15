@@ -49,8 +49,6 @@ using Telegram.Views.Users;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.ApplicationModel.AppService;
-using Windows.ApplicationModel.DataTransfer;
-using Windows.ApplicationModel.DataTransfer.ShareTarget;
 using Windows.ApplicationModel.ExtendedExecution;
 using Windows.UI.Notifications;
 using Windows.UI.ViewManagement;
@@ -61,10 +59,6 @@ namespace Telegram
 {
     sealed partial class App : BootStrapper
     {
-        public static ShareOperation ShareOperation { get; set; }
-
-        public static DataPackageView DataPackage { get; set; }
-
         private static ExtendedExecutionSession _extendedSession;
 
         /// <summary>
@@ -83,6 +77,7 @@ namespace Telegram
             }
 
             WatchDog.Initialize();
+            MediaHttpServer.Start();
             TypeResolver.Current.Configure();
 
             RequestedTheme = SettingsService.Current.Appearance.GetCalculatedApplicationTheme();
@@ -215,9 +210,7 @@ namespace Telegram
             }
 
             var sessionId = TypeResolver.Current.Lifetime.ActiveItem.Id;
-
-            var navigationFrame = new Frame();
-            var navigationService = NavigationServiceFactory(window, BackButton.Ignore, navigationFrame, sessionId, $"{sessionId}", true) as NavigationService;
+            var navigationService = NavigationServiceFactory(window, BackButton.Ignore, sessionId, $"{sessionId}", true) as NavigationService;
 
             if (e is ShareTargetActivatedEventArgs)
             {
@@ -385,7 +378,7 @@ namespace Telegram
                 SupergroupMembersPage supergroupMembers => TypeResolver.Current.Resolve<SupergroupMembersViewModel, ISupergroupDelegate>(supergroupMembers, sessionId),
                 SupergroupPermissionsPage supergroupPermissions => TypeResolver.Current.Resolve<SupergroupPermissionsViewModel, ISupergroupDelegate>(supergroupPermissions, sessionId),
                 SupergroupTopicsPage => TypeResolver.Current.Resolve<SupergroupTopicsViewModel>(sessionId),
-                SupergroupFeedbackGroupPage => TypeResolver.Current.Resolve<SupergroupFeedbackGroupViewModel>(sessionId),
+                SupergroupDirectMessagesPage => TypeResolver.Current.Resolve<SupergroupDirectMessagesViewModel>(sessionId),
                 SupergroupReactionsPopup => TypeResolver.Current.Resolve<SupergroupReactionsViewModel>(sessionId),
                 SupergroupProfileColorPage => TypeResolver.Current.Resolve<SupergroupProfileColorViewModel>(sessionId),
                 ChatBoostsPage => TypeResolver.Current.Resolve<ChatBoostsViewModel>(sessionId),

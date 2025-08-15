@@ -117,6 +117,19 @@ namespace Telegram.Controls
 
         #endregion
 
+        #region Description
+
+        public object Description
+        {
+            get { return (object)GetValue(DescriptionProperty); }
+            set { SetValue(DescriptionProperty, value); }
+        }
+
+        public static readonly DependencyProperty DescriptionProperty =
+            DependencyProperty.Register("Description", typeof(object), typeof(BadgeButton), new PropertyMetadata(null));
+
+        #endregion
+
         #region IconSource
 
         public IAnimatedVisualSource2 IconSource
@@ -302,6 +315,20 @@ namespace Telegram.Controls
         protected override IList<AutomationPeer> GetChildrenCore()
         {
             return null;
+        }
+
+        protected override string GetFullDescriptionCore()
+        {
+            if (_owner.Description is FrameworkElement element)
+            {
+                var peer = FrameworkElementAutomationPeer.FromElement(element);
+                if (peer != null)
+                {
+                    return peer.GetName();
+                }
+            }
+
+            return _owner.Description?.ToString() ?? string.Empty;
         }
 
         public string Value

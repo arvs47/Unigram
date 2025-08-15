@@ -13,19 +13,58 @@
 
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.UI.h>
+#include <winrt/Windows.UI.Composition.H>
 #include <winrt/Windows.Storage.Streams.h>
+#include <winrt/Windows.Graphics.h>
+#include <windows.graphics.interop.h>
 
 #include <winrt/Telegram.Td.Api.h>
 
 using namespace concurrency;
+using namespace ABI::Windows::Graphics;
+using namespace winrt::Windows::Graphics;
 using namespace winrt::Windows::UI;
+using namespace winrt::Windows::UI::Composition;
 using namespace winrt::Windows::Foundation::Collections;
 using namespace winrt::Windows::Foundation::Numerics;
 using namespace winrt::Windows::Storage::Streams;
 using namespace winrt::Telegram::Td::Api;
 
+#define IFACEMETHODIMP2        __override COM_DECLSPEC_NOTHROW HRESULT STDMETHODCALLTYPE
+
 namespace winrt::Telegram::Native::implementation
 {
+    class CompositionPathSource
+        : public winrt::implements<CompositionPathSource, winrt::Windows::Graphics::IGeometrySource2D, IGeometrySource2DInterop>
+    {
+    public:
+        CompositionPathSource(winrt::com_ptr<ID2D1Geometry> geometry)
+            : m_geometry(geometry)
+        {
+        }
+
+        IFACEMETHODIMP2 GetGeometry(
+            _COM_Outptr_ ID2D1Geometry** value
+        ) override
+        {
+            *value = nullptr;
+            m_geometry.copy_to(value);
+            return S_OK;
+        }
+
+        IFACEMETHODIMP2 TryGetGeometryUsingFactory(
+            _In_ ID2D1Factory* factory,
+            _COM_Outptr_result_maybenull_ ID2D1Geometry** value
+        ) override
+        {
+            *value = nullptr;
+            return S_OK;
+        }
+
+    private:
+        winrt::com_ptr<ID2D1Geometry> m_geometry;
+    };
+
     struct PlaceholderImageHelper : PlaceholderImageHelperT<PlaceholderImageHelper>
     {
     public:
@@ -41,24 +80,43 @@ namespace winrt::Telegram::Native::implementation
             return S_OK;
         }
 
-        static winrt::Telegram::Native::PlaceholderImageHelper Current()
+        static winrt::Telegram::Native::PlaceholderImageHelper Background()
         {
             std::lock_guard const guard(s_criticalSection);
 
-            if (s_current == nullptr)
+            if (s_background == nullptr)
             {
-                s_current = winrt::make_self<PlaceholderImageHelper>();
+                s_background = winrt::make_self<PlaceholderImageHelper>();
             }
 
-            s_current->HandleDeviceLost();
-            return s_current.as<winrt::Telegram::Native::PlaceholderImageHelper>();
+            s_background->HandleDeviceLost();
+            return s_background.as<winrt::Telegram::Native::PlaceholderImageHelper>();
+        }
+
+        static winrt::Telegram::Native::PlaceholderImageHelper Foreground()
+        {
+            std::lock_guard const guard(s_criticalSection);
+
+            if (s_foreground == nullptr)
+            {
+                s_foreground = winrt::make_self<PlaceholderImageHelper>();
+            }
+
+            s_foreground->HandleDeviceLost();
+            return s_foreground.as<winrt::Telegram::Native::PlaceholderImageHelper>();
         }
 
         static HRESULT WriteBytes(IVector<byte> hash, IRandomAccessStream randomAccessStream) noexcept;
         static IBuffer DrawWebP(hstring fileName, int32_t maxWidth, int32_t& pixelWidth, int32_t& pixelHeight) noexcept;
         static bool IsWebP(hstring fileName, int32_t& pixelWidth, int32_t& pixelHeight) noexcept;
 
-        HRESULT Encode(IBuffer source, IRandomAccessStream destination, int32_t width, int32_t height);
+        CompositionPath GetTail(float width, float height, float topLeftRadius, float topRightRadius, float bottomRightRadius, float bottomLeftRadius);
+        CompositionPath GetOutline(IVector<ClosedVectorPath> contours);
+        CompositionPath GetEllipticalClip(float width, float height, float radius, float x, float y);
+        CompositionPath GetReplyMarkupClip(IVector<IVector<Windows::Foundation::Rect>> rows, float bottomRightRadius, float bottomLeftRadius);
+        CompositionPath GetVoiceNoteClip(IVector<byte> waveform, double waveformWidth);
+
+        HRESULT Encode(IBuffer source, IRandomAccessStream destination, int32_t width, int32_t height, int32_t rotation);
 
         winrt::Windows::Foundation::IAsyncAction DrawSvgAsync(hstring path, Color foreground, IRandomAccessStream randomAccessStream, double dpi);
         HRESULT DrawSvg(hstring path, Color foreground, IRandomAccessStream randomAccessStream, double dpi, Windows::Foundation::Size& size);
@@ -74,8 +132,8 @@ namespace winrt::Telegram::Native::implementation
 
         float2 ContentEnd(hstring text, IVector<TextEntity> entities, double fontSize, double width);
         IVector<Windows::Foundation::Rect> LineMetrics(hstring text, IVector<TextEntity> entities, double fontSize, double width, bool rtl);
-        IVector<Windows::Foundation::Rect> RangeMetrics(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, bool rtl);
-        int32_t TrimMetrics(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, double height, bool rtl);
+        IVector<Windows::Foundation::Rect> RangeMetrics(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, bool rtl, bool wrap);
+        Windows::Foundation::Rect LayoutMetrics(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, bool rtl);
         //IVector<Windows::Foundation::Rect> EntityMetrics(hstring text, IVector<TextEntity> entities, double fontSize, double width, bool rtl);
 
     private:
@@ -88,14 +146,12 @@ namespace winrt::Telegram::Native::implementation
         HRESULT SaveImageToStream(ID2D1Image* image, REFGUID wicFormat, IRandomAccessStream randomAccessStream);
 
         HRESULT CreateTextFormatImpl(hstring text, IVector<TextEntity> entities, double fontSize, double width, winrt::com_ptr<TextFormat>& textFormat);
-        HRESULT ContentEndImpl(hstring text, IVector<TextEntity> entities, double fontSize, double width, float2& offset);
-        HRESULT RangeMetricsImpl(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, bool rtl, IVector<Windows::Foundation::Rect>& rects);
-        HRESULT TrimMetricsImpl(hstring text, int32_t offset, int32_t length, IVector<TextEntity> entities, double fontSize, double width, double height, bool rtl, int32_t& output);
 
 
     public:
         static std::mutex s_criticalSection;
-        static winrt::com_ptr<PlaceholderImageHelper> s_current;
+        static winrt::com_ptr<PlaceholderImageHelper> s_foreground;
+        static winrt::com_ptr<PlaceholderImageHelper> s_background;
 
         winrt::com_ptr<ID2D1Factory1> m_d2dFactory;
         winrt::com_ptr<ID2D1Device> m_d2dDevice;

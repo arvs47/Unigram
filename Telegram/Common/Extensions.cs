@@ -51,8 +51,6 @@ using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Navigation;
-using static Telegram.Services.GenerationService;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Common
 {
@@ -314,7 +312,7 @@ namespace Telegram.Common
                 // Element start
                 index++;
 
-                if (OffsetToIndex(textBlock, block.Inlines, pointer, ref index))
+                if (OffsetToIndex(textBlock, block, block.Inlines, pointer, ref index))
                 {
                     break;
                 }
@@ -323,12 +321,12 @@ namespace Telegram.Common
                 {
                     if (pointer.Offset == block.ContentEnd.Offset)
                     {
-                        if (i == textBlock.Blocks.Count - 1)
-                        {
-                            // Always close when ending on the last paragraph
-                            index++;
-                        }
-                        else
+                        //if (i == textBlock.Blocks.Count - 1)
+                        //{
+                        //    // Always close when ending on the last paragraph
+                        //    index++;
+                        //}
+                        //else
                         {
                             index += paragraph.Padding;
                         }
@@ -344,14 +342,19 @@ namespace Telegram.Common
             // Adjust the offset if the selection ends on the text block itself
             if (pointer.Offset == textBlock.ContentEnd.Offset && pointer.Parent is RichTextBlock)
             {
-                index += 2;
+                index++;
             }
 
             return pointer.Offset - index;
         }
 
-        private static bool OffsetToIndex(RichTextBlock textBlock, InlineCollection inlines, TextPointer pointer, ref int index)
+        private static bool OffsetToIndex(RichTextBlock textBlock, TextElement parent, InlineCollection inlines, TextPointer pointer, ref int index)
         {
+            if (parent.ContentStart.Offset == pointer.Offset && inlines.Empty())
+            {
+                index--;
+            }
+
             foreach (var element in inlines)
             {
                 if (pointer.Offset == element.ElementStart.Offset)
@@ -362,7 +365,7 @@ namespace Telegram.Common
                 // Element start
                 index++;
 
-                if (element is Span span && OffsetToIndex(textBlock, span.Inlines, pointer, ref index))
+                if (element is Span span && OffsetToIndex(textBlock, span, span.Inlines, pointer, ref index))
                 {
                     return true;
                 }
@@ -394,6 +397,11 @@ namespace Telegram.Common
                 return -1;
             }
 
+            return OffsetToIndex(pointer, textBlock);
+        }
+
+        public static int OffsetToIndex(this TextPointer pointer, RichTextBlock textBlock)
+        {
             var index = 0;
 
             for (int i = 0; i < textBlock.Blocks.Count; i++)
@@ -408,7 +416,7 @@ namespace Telegram.Common
                 // Element start
                 index++;
 
-                if (OffsetToIndex(textBlock, block.Inlines, pointer, ref index))
+                if (OffsetToIndex(textBlock, block, block.Inlines, pointer, ref index))
                 {
                     break;
                 }
@@ -551,6 +559,30 @@ namespace Telegram.Common
             try
             {
                 operation.ReportCompleted();
+            }
+            catch
+            {
+                // All the remote procedure calls must be wrapped in a try-catch block
+            }
+        }
+
+        public static void TryReportDataRetrieved(this ShareOperation operation)
+        {
+            try
+            {
+                operation.ReportDataRetrieved();
+            }
+            catch
+            {
+                // All the remote procedure calls must be wrapped in a try-catch block
+            }
+        }
+
+        public static void TryReportError(this ShareOperation operation, string value)
+        {
+            try
+            {
+                operation.ReportError(value);
             }
             catch
             {
@@ -845,6 +877,16 @@ namespace Telegram.Common
             return new Size(rectangle.Width, rectangle.Height);
         }
 
+        public static Vector2 ToSizeF(this Rect rectangle)
+        {
+            return new Vector2((float)rectangle.Width, (float)rectangle.Height);
+        }
+
+        public static Vector3 ToOffset(this Rect rectangle)
+        {
+            return new Vector3((float)rectangle.X, (float)rectangle.Y, 0);
+        }
+
         public static bool IntersectsWith(this Rect a, Rect b)
         {
             return (b.X <= a.X + a.Width) &&
@@ -1011,6 +1053,11 @@ namespace Telegram.Common
             return output;
         }
 
+        public static string ReplaceStar(this string str, string value)
+        {
+            return str.Replace("\u2B50\uFE0F", value + "\u200A");
+        }
+
         /// <summary>
         /// Creates a relative path from one file or folder to another.
         /// </summary>
@@ -1050,6 +1097,12 @@ namespace Telegram.Common
 
         public static bool IsRelativePath(string relativeTo, string path, out string relative)
         {
+            if (string.IsNullOrEmpty(relativeTo) || string.IsNullOrEmpty(path))
+            {
+                relative = null;
+                return false;
+            }
+
             var relativeFull = Path.GetFullPath(relativeTo);
             var pathFull = Path.GetFullPath(path);
 
@@ -1064,6 +1117,27 @@ namespace Telegram.Common
 
             relative = null;
             return string.Equals(relativeFull, pathFull, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static unsafe void Buffer(this WriteableBitmap bitmap, out byte* imageBytes)
+        {
+#if NET9_0_OR_GREATER
+            var access = bitmap.PixelBuffer.As<IBufferByteAccess>();
+#else
+            var access = (IBufferByteAccess)bitmap.PixelBuffer;
+#endif
+            access.Buffer(out imageBytes);
+        }
+
+        public static unsafe void Buffer(this IMemoryBufferReference reference, out byte* buffer, out uint capacity)
+        {
+#if NET9_0_OR_GREATER
+            var access = reference.As<IMemoryBufferByteAccess>();
+#else
+            var access = (IMemoryBufferByteAccess)reference;
+#endif
+            access.GetBuffer(out buffer, out capacity);
+
         }
 
         public static async Task<InputFile> ToGeneratedAsync(this StorageFile file, ConversionType conversion = ConversionType.Copy, string arguments = null, bool forceCopy = false)
@@ -1107,30 +1181,7 @@ namespace Telegram.Common
             }
         }
 
-        public static async Task<InputThumbnail> ToVideoThumbnailAsync(this StorageFile file, VideoConversion video = null, ConversionType conversion = ConversionType.Copy, string arguments = null)
-        {
-            var props = await file.Properties.GetVideoPropertiesAsync();
-
-            double originalWidth = props.GetWidth();
-            double originalHeight = props.GetHeight();
-
-            if (!video.CropRectangle.IsEmpty)
-            {
-                originalWidth = video.CropRectangle.Width;
-                originalHeight = video.CropRectangle.Height;
-            }
-
-            double ratioX = 90 / originalWidth;
-            double ratioY = 90 / originalHeight;
-            double ratio = Math.Min(ratioX, ratioY);
-
-            int width = (int)(originalWidth * ratio);
-            int height = (int)(originalHeight * ratio);
-
-            return new InputThumbnail(await file.ToGeneratedAsync(conversion, arguments), width, height);
-        }
-
-        public static async Task<InputThumbnail> ToVideoThumbnailAsync(this StorageVideo file, VideoConversion video = null, ConversionType conversion = ConversionType.Copy, string arguments = null)
+        public static async Task<InputThumbnail> ToVideoThumbnailAsync(this StorageVideo file, VideoGeneration video = null, ConversionType conversion = ConversionType.Copy, string arguments = null)
         {
             double originalWidth = file.Width;
             double originalHeight = file.Height;
@@ -1151,6 +1202,7 @@ namespace Telegram.Common
             return new InputThumbnail(await file.File.ToGeneratedAsync(conversion, arguments), width, height);
         }
 
+#if !NET9_0_OR_GREATER
         public static IEnumerable<TSource> DistinctBy<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector)
         {
             HashSet<TKey> seenKeys = new();
@@ -1162,6 +1214,7 @@ namespace Telegram.Common
                 }
             }
         }
+#endif
 
         public static T RemoveLast<T>(this List<T> list)
         {
@@ -1303,7 +1356,7 @@ namespace Telegram.Common
             var first = query.Split('?');
             if (first.Length > 1)
             {
-                query = first.Last();
+                query = first[^1];
             }
 
             var queryDict = new Dictionary<string, string>();
@@ -1435,6 +1488,16 @@ namespace Telegram.Common
             return GetHyperlink(parent.ElementStart.Parent as TextElement);
         }
 
+        public static bool ClearIfNotEmpty<T>(this IList<T> list)
+        {
+            if (list.Count > 0)
+            {
+                list.Clear();
+            }
+
+            return false;
+        }
+
         public static bool Empty<T>(this IList<T> list)
         {
             return list.Count == 0;
@@ -1456,6 +1519,16 @@ namespace Telegram.Common
         public static T GetChild<T>(this DependencyObject parentContainer, Func<T, bool> predicate)
         {
             return parentContainer.Descendants<T>().FirstOrDefault(predicate);
+        }
+
+        public static T GetLastChild<T>(this DependencyObject parentContainer)
+        {
+            return parentContainer.Descendants<T>(true).FirstOrDefault();
+        }
+
+        public static T GetLastChild<T>(this DependencyObject parentContainer, Func<T, bool> predicate)
+        {
+            return parentContainer.Descendants<T>(true).FirstOrDefault(predicate);
         }
 
         public static T GetChildOrSelf<T>(this DependencyObject parentContainer)
@@ -1561,6 +1634,8 @@ namespace Telegram.Common
 
             return new BitmapImage(ToLocal(path))
             {
+                // TODO: experiment
+                //CreateOptions = BitmapCreateOptions.IgnoreImageCache,
                 DecodePixelWidth = width,
                 DecodePixelHeight = height,
                 DecodePixelType = width > 0 || height > 0

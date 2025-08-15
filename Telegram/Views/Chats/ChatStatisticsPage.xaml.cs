@@ -119,17 +119,7 @@ namespace Telegram.Views.Chats
                     }
                     else if (message.Content is MessageAudio audio)
                     {
-                        var performer = string.IsNullOrEmpty(audio.Audio.Performer) ? null : audio.Audio.Performer;
-                        var titloe = string.IsNullOrEmpty(audio.Audio.Title) ? null : audio.Audio.Title;
-
-                        if (performer == null || titloe == null)
-                        {
-                            title.Text = Strings.AttachMusic;
-                        }
-                        else
-                        {
-                            title.Text = $"\uD83C\uDFB5 {performer} - {titloe}";
-                        }
+                        title.Text = audio.Audio.GetTitle();
                     }
                     else if (message.Content is MessageDocument document)
                     {
@@ -169,6 +159,10 @@ namespace Telegram.Views.Chats
                     else if (message.Content is MessagePoll poll)
                     {
                         title.Text = "\uD83D\uDCCA " + poll.Poll.Question.Text;
+                    }
+                    else if (message.Content is MessageChecklist checklist)
+                    {
+                        title.Text = "\u2611 " + checklist.List.Title.Text;
                     }
                     else if (message.Content is MessageCall call)
                     {

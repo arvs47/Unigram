@@ -48,8 +48,8 @@ namespace Telegram.Controls.Cells.Premium
             }
             else
             {
-                FrameOutside.Margin = new Thickness(0, 0, 0, 0);
-                FrameInside.Margin = new Thickness(0, 0, 0, 0);
+                FrameOutside.Margin = new Thickness(0);
+                FrameInside.Margin = new Thickness(0);
 
                 Canvas.SetTop(FrameScreen, 28);
                 Canvas.SetTop(Player, 28);
@@ -142,6 +142,10 @@ namespace Telegram.Controls.Cells.Premium
                     titleValue = Strings.PremiumPreviewEffects;
                     subtitleValue = Strings.PremiumPreviewEffectsDescription;
                     break;
+                case PremiumFeatureChecklists:
+                    titleValue = Strings.PremiumPreviewTodo;
+                    subtitleValue = Strings.PremiumPreviewTodoDescription;
+                    break;
             }
 
             Title.Text = titleValue;
@@ -181,8 +185,8 @@ namespace Telegram.Controls.Cells.Premium
             }
             else
             {
-                FrameOutside.Margin = new Thickness(0, 0, 0, 0);
-                FrameInside.Margin = new Thickness(0, 0, 0, 0);
+                FrameOutside.Margin = new Thickness(0);
+                FrameInside.Margin = new Thickness(0);
 
                 Canvas.SetTop(FrameScreen, 28);
                 Canvas.SetTop(Player, 28);

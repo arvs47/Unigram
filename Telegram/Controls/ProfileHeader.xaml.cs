@@ -12,10 +12,10 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Telegram.Common;
+using Telegram.Controls.Cells;
 using Telegram.Controls.Gallery;
 using Telegram.Controls.Media;
 using Telegram.Converters;
-using Telegram.Native;
 using Telegram.Navigation;
 using Telegram.Services;
 using Telegram.Services.Updates;
@@ -34,209 +34,9 @@ using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
-using Point = Windows.Foundation.Point;
 
 namespace Telegram.Controls
 {
-    public partial class ProfileHeaderPattern : Control
-    {
-        public ProfileHeaderPattern()
-        {
-            DefaultStyleKey = typeof(ProfileHeaderPattern);
-        }
-
-        protected override void OnApplyTemplate()
-        {
-            var animated = GetTemplateChild("Animated") as AnimatedImage;
-            var layoutRoot = GetTemplateChild("LayoutRoot") as Border;
-
-            animated.Ready += OnReady;
-
-            var visual = ElementComposition.GetElementVisual(animated);
-            var compositor = visual.Compositor;
-
-            // Create a VisualSurface positioned at the same location as this control and feed that
-            // through the color effect.
-            var surfaceBrush = compositor.CreateSurfaceBrush();
-            var surface = compositor.CreateVisualSurface();
-
-            // Select the source visual and the offset/size of this control in that element's space.
-            surface.SourceVisual = visual;
-            surface.SourceOffset = new Vector2(0, 0);
-            surface.SourceSize = new Vector2(37, 37);
-            surfaceBrush.HorizontalAlignmentRatio = 0.5f;
-            surfaceBrush.VerticalAlignmentRatio = 0.5f;
-            surfaceBrush.Surface = surface;
-            surfaceBrush.Stretch = CompositionStretch.Fill;
-            surfaceBrush.BitmapInterpolationMode = CompositionBitmapInterpolationMode.NearestNeighbor;
-            surfaceBrush.SnapToPixels = true;
-
-            var container = compositor.CreateContainerVisual();
-            container.Size = new Vector2(1000, 320);
-
-            var clones = Generate(0);
-
-            for (int i = 1; i < clones.Count; i++)
-            {
-                Vector4 clone = clones[i];
-
-                var redirect = compositor.CreateSpriteVisual();
-                redirect.Size = new Vector2(clone.Z);
-                redirect.Offset = new Vector3(clone.X, clone.Y, 0);
-                redirect.CenterPoint = new Vector3(clone.Z / 2);
-                redirect.Opacity = clone.W;
-                redirect.Brush = surfaceBrush;
-
-                container.Children.InsertAtTop(redirect);
-            }
-
-            ElementCompositionPreview.SetElementChildVisual(layoutRoot, container);
-        }
-
-        private void OnReady(object sender, EventArgs e)
-        {
-            var layoutRoot = GetTemplateChild("LayoutRoot") as Border;
-            var container = ElementCompositionPreview.GetElementChildVisual(layoutRoot) as ContainerVisual;
-
-            var scale = container.Compositor.CreateVector3KeyFrameAnimation();
-            scale.InsertKeyFrame(0, Vector3.Zero);
-            scale.InsertKeyFrame(1, Vector3.One);
-
-            var batch = container.Compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
-
-            foreach (var redirect in container.Children)
-            {
-                redirect.StartAnimation("Scale", scale);
-            }
-
-            batch.End();
-        }
-
-        public void Update(float avatarTransitionFraction)
-        {
-            var layoutRoot = GetTemplateChild("LayoutRoot") as Border;
-            var container = ElementCompositionPreview.GetElementChildVisual(layoutRoot) as ContainerVisual;
-
-            var clones = Generate(avatarTransitionFraction);
-            var i = 0;
-
-            foreach (var redirect in container.Children)
-            {
-                Vector4 clone = clones[i++];
-
-                redirect.Size = new Vector2(clone.Z);
-                redirect.Offset = new Vector3(clone.X, clone.Y, 0);
-                redirect.Opacity = clone.W;
-            }
-        }
-
-        private float windowFunction(float t)
-        {
-            return BezierPoint.Calculate(0.6f, 0.0f, 0.4f, 1.0f, t);
-        }
-
-        private float patternScaleValueAt(float fraction, float t, bool reverse)
-        {
-            float windowSize = 0.8f;
-
-            float effectiveT;
-            float windowStartOffset;
-            float windowEndOffset;
-            if (reverse)
-            {
-                effectiveT = 1.0f - t;
-                windowStartOffset = 1.0f;
-                windowEndOffset = -windowSize;
-            }
-            else
-            {
-                effectiveT = t;
-                windowStartOffset = -0.3f;
-                windowEndOffset = 1.0f;
-            }
-
-            float windowPosition = (1.0f - fraction) * windowStartOffset + fraction * windowEndOffset;
-            float windowT = MathF.Max(0.0f, MathF.Min(windowSize, effectiveT - windowPosition)) / windowSize;
-            float localT = 1.0f - windowFunction(t: windowT);
-
-            return localT;
-        }
-
-        private IList<Vector4> Generate(float avatarTransitionFraction)
-        {
-            var results = new List<Vector4>();
-
-            var avatarPatternFrame = new Vector2(1000 - 36, 86 + 36 * 2);
-            //var avatarPatternFrame = new Vector2(500, 500);
-
-            var lokiRng = new LokiRng(seed0: 123, seed1: 0, seed2: 0);
-            var numRows = 5;
-
-            for (int row = 0; row < numRows; row++)
-            {
-                int avatarPatternCount = 7;
-                float avatarPatternAngleSpan = MathF.PI * 2.0f / (avatarPatternCount - 1f);
-
-                for (int i = 0; i < avatarPatternCount - 1; i++)
-                {
-                    float baseItemDistance;
-                    float itemDistanceFraction;
-                    float itemScaleFraction;
-                    float itemDistance;
-
-                    if (IsSmall)
-                    {
-                        baseItemDistance = 72.0f + row * 28.0f;
-
-                        itemDistanceFraction = MathF.Max(0.0f, MathF.Min(1.0f, baseItemDistance / 140.0f));
-                        itemScaleFraction = patternScaleValueAt(fraction: avatarTransitionFraction, t: itemDistanceFraction, reverse: false);
-                        itemDistance = baseItemDistance * (1.0f - itemScaleFraction) + 20.0f * itemScaleFraction;
-                    }
-                    else
-                    {
-                        baseItemDistance = 100.0f + row * 40.0f;
-
-                        itemDistanceFraction = MathF.Max(0.0f, MathF.Min(1.0f, baseItemDistance / 196.0f));
-                        itemScaleFraction = patternScaleValueAt(fraction: avatarTransitionFraction, t: itemDistanceFraction, reverse: false);
-                        itemDistance = baseItemDistance * (1.0f - itemScaleFraction) + 28.0f * itemScaleFraction;
-                    }
-
-
-                    float itemAngle = -MathF.PI * 0.5f + i * avatarPatternAngleSpan;
-
-                    if (row % 2 != 0)
-                    {
-                        itemAngle += avatarPatternAngleSpan * 0.5f;
-                    }
-
-                    Vector2 itemPosition = new Vector2(avatarPatternFrame.X * 0.5f + MathF.Cos(itemAngle) * itemDistance, avatarPatternFrame.Y * 0.5f + MathF.Sin(itemAngle) * itemDistance);
-
-                    float itemScale = 0.7f + lokiRng.Next() * (1.0f - 0.7f);
-                    float itemSize = MathF.Floor((IsSmall ? 32 : 36) * itemScale);
-
-                    results.Add(new Vector4(itemPosition.X, itemPosition.Y, itemSize, 1.0f - itemScaleFraction));
-                }
-            }
-
-            return results;
-        }
-
-        public bool IsSmall { get; set; } = false;
-
-        #region Source
-
-        public AnimatedImageSource Source
-        {
-            get { return (AnimatedImageSource)GetValue(SourceProperty); }
-            set { SetValue(SourceProperty, value); }
-        }
-
-        public static readonly DependencyProperty SourceProperty =
-            DependencyProperty.Register("Source", typeof(AnimatedImageSource), typeof(ProfileHeaderPattern), new PropertyMetadata(null));
-
-        #endregion
-    }
-
     public sealed partial class ProfileHeader : UserControl
     {
         public ProfileViewModel ViewModel => DataContext as ProfileViewModel;
@@ -246,12 +46,36 @@ namespace Telegram.Controls
             InitializeComponent();
             DescriptionLabel.AddHandler(ContextRequestedEvent, new TypedEventHandler<UIElement, ContextRequestedEventArgs>(About_ContextRequested), true);
 
+            HeaderRoot.CreateInsetClip();
+
             ActualThemeChanged += OnActualThemeChanged;
+            SizeChanged += OnSizeChanged;
+
+            Properties = BootStrapper.Current.Compositor.CreatePropertySet();
+            Properties.InsertScalar("HeaderActualHeight", HeaderRoot.ActualSize.Y);
+            Properties.InsertScalar("ActualHeight", ActualSize.Y - 48 + 16);
+            Properties.InsertScalar("RemovedHeight", 0);
         }
 
-        public ElementTheme HeaderTheme => HeaderRoot.RequestedTheme;
+        private void OnSizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            Properties.InsertScalar("HeaderActualHeight", HeaderRoot.ActualSize.Y);
+            Properties.InsertScalar("ActualHeight", ActualSize.Y - 48 + 16);
 
-        private CompositionPropertySet _properties;
+            if (ViewModel.IsSavedMessages)
+            {
+                Properties.InsertScalar("RemovedHeight", HeaderRoot.ActualSize.Y - 48);
+                HeaderRoot.Margin = new Thickness(0, -HeaderRoot.ActualHeight + 48, 0, 0);
+            }
+        }
+
+        public CompositionPropertySet Properties { get; }
+
+        public double OccludedHeight => ViewModel.IsSavedMessages ? 0 : HeaderRoot.ActualHeight - 48;
+
+        public float HeaderHeight => HeaderRoot.ActualSize.Y;
+
+        public ElementTheme HeaderTheme => HeaderRoot.RequestedTheme;
 
         private void OnActualThemeChanged(FrameworkElement sender, object args)
         {
@@ -259,6 +83,9 @@ namespace Telegram.Controls
             {
                 return;
             }
+
+            TitleRoot.RequestedTheme = !_backgroundCollapsed ? sender.ActualTheme : HeaderTheme;
+            SubtitleRoot.RequestedTheme = !_backgroundCollapsed ? sender.ActualTheme : HeaderTheme;
 
             UpdateChatAccentColors(ViewModel.Chat);
         }
@@ -299,74 +126,184 @@ namespace Telegram.Controls
             GalleryWindow.ShowAsync(ViewModel, ViewModel.StorageService, ViewModel.Chat, Photo);
         }
 
-        public void ViewChanged(double verticalOffset)
+        private float _verticalOffset;
+
+        public void ViewChanged(ScrollViewer scrollingHost, float verticalOffset)
         {
-            Pattern.Update((float)(verticalOffset / HeaderRoot.ActualHeight));
+            _verticalOffset = verticalOffset;
+            Pattern.Update(verticalOffset / (32 + 140 + 384));
+            GiftsCover.Update(verticalOffset / (32 + 140 + 96), TitleRoot);
 
-            var visual = ElementComposition.GetElementVisual(Segments);
-            visual.CenterPoint = new Vector3(70, 70, 0);
-            visual.Scale = new Vector3(1 - (float)(verticalOffset / HeaderRoot.ActualHeight));
+            ShowHideBackground(verticalOffset >= HeaderRoot.ActualHeight - 48);
+            ShowHideSubtitle(verticalOffset >= ActualHeight - 48);
+        }
 
-            var title = ElementComposition.GetElementVisual(TitleRoot);
-            var subtitle = ElementComposition.GetElementVisual(SubtitleRoot);
+        private bool _subtitleCollapsed = true;
 
-            title.CenterPoint = new Vector3(TitleRoot.ActualSize.X / 2, TitleRoot.ActualSize.Y, 0);
-            subtitle.CenterPoint = new Vector3(SubtitleRoot.ActualSize.X / 2, 0, 0);
+        private void ShowHideSubtitle(bool show)
+        {
+            if (_subtitleCollapsed != show)
+            {
+                return;
+            }
+
+            _subtitleCollapsed = !show;
+            SubtitleTab.Visibility = Visibility.Visible;
+
+            var subtitleTab = ElementComposition.GetElementVisual(SubtitleTab);
+            var subtitlePro = ElementComposition.GetElementVisual(SubtitleMain);
+
+            var opacityIn = subtitlePro.Compositor.CreateScalarKeyFrameAnimation();
+            opacityIn.InsertKeyFrame(0, show ? 0 : 1);
+            opacityIn.InsertKeyFrame(1, show ? 1 : 0);
+
+            var opacityOut = subtitlePro.Compositor.CreateScalarKeyFrameAnimation();
+            opacityOut.InsertKeyFrame(0, show ? 1 : 0);
+            opacityOut.InsertKeyFrame(1, show ? 0 : 1);
+
+            subtitleTab.StartAnimation("Opacity", opacityIn);
+            subtitlePro.StartAnimation("Opacity", opacityOut);
+        }
+
+        private bool _backgroundCollapsed = true;
+
+        private void ShowHideBackground(bool show)
+        {
+            if (_backgroundCollapsed != show)
+            {
+                return;
+            }
+
+            _backgroundCollapsed = !show;
+
+            if (HeaderTheme != ElementTheme.Default)
+            {
+                if (show)
+                {
+                    Identity.ClearValue(ForegroundProperty);
+                    BotVerified.ClearValue(AnimatedImage.ReplacementColorProperty);
+                }
+                else
+                {
+                    Identity.Foreground = new SolidColorBrush(Colors.White);
+                    BotVerified.ReplacementColor = new SolidColorBrush(Colors.White);
+                }
+
+                TitleRoot.RequestedTheme = show ? ActualTheme : HeaderTheme;
+                SubtitleRoot.RequestedTheme = show ? ActualTheme : HeaderTheme;
+            }
+
+            var headerBackground = ElementComposition.GetElementVisual(HeaderBackground);
+            var headerGlow = ElementComposition.GetElementVisual(HeaderGlow);
+
+            var opacityOut = headerBackground.Compositor.CreateScalarKeyFrameAnimation();
+            opacityOut.InsertKeyFrame(0, show ? 1 : 0);
+            opacityOut.InsertKeyFrame(1, show ? 0 : 1);
+
+            headerBackground.StartAnimation("Opacity", opacityOut);
+            headerGlow.StartAnimation("Opacity", opacityOut);
         }
 
         public void InitializeScrolling(CompositionPropertySet properties)
         {
-            _properties = properties.Compositor.CreatePropertySet();
-            _properties.InsertScalar("targetY", HeaderRoot.ActualSize.Y);
-
             var target = ElementComposition.GetElementVisual(this);
             var controls = ElementComposition.GetElementVisual(ControlsRoot);
+            var background = ElementComposition.GetElementVisual(ClipperBackground);
             var title = ElementComposition.GetElementVisual(TitleRoot);
             var subtitle = ElementComposition.GetElementVisual(SubtitleRoot);
             var buttons = ElementComposition.GetElementVisual(Buttons);
             var root = ElementComposition.GetElementVisual(HeaderRoot);
+            var photoRoot = ElementComposition.GetElementVisual(HeaderPhotoRoot);
+            var photo = ElementComposition.GetElementVisual(HeaderPhoto);
 
             ElementCompositionPreview.SetIsTranslationEnabled(Buttons, true);
             ElementCompositionPreview.SetIsTranslationEnabled(HeaderRoot, true);
+            ElementCompositionPreview.SetIsTranslationEnabled(ClipperBackground, true);
             ElementCompositionPreview.SetIsTranslationEnabled(TitleRoot, true);
             ElementCompositionPreview.SetIsTranslationEnabled(SubtitleRoot, true);
+            ElementCompositionPreview.SetIsTranslationEnabled(HeaderPhotoRoot, true);
+
+            var translationExp = "(scrollViewer.Translation.Y - _.RemovedHeight)";
 
             //var rootExp = "clamp(-scrollViewer.Translation.Y - (this.Target.Size.Y - 48 + 0), 0, target.Size.Y - this.Target.Size.Y)";
-            var rootExp = "clamp(-scrollViewer.Translation.Y - (this.Target.Size.Y - 48 + 16), 0, target.Size.Y - this.Target.Size.Y)";
+            var rootExp = $"{translationExp} < 0 ? clamp(-{translationExp} - (this.Target.Size.Y - 48), 0, 2147483647) : -{translationExp}";
             var rootTranslation = root.Compositor.CreateExpressionAnimation(rootExp);
             rootTranslation.SetReferenceParameter("scrollViewer", properties);
             rootTranslation.SetReferenceParameter("target", target);
+            rootTranslation.SetReferenceParameter("_", Properties);
+
+            var photoExp = $"clamp(1 - -{translationExp} / root.Size.Y, 0, 1)";
+            var photoScale = root.Compositor.CreateExpressionAnimation($"vector3({photoExp}, {photoExp}, 1)");
+            photoScale.SetReferenceParameter("scrollViewer", properties);
+            photoScale.SetReferenceParameter("root", root);
+            photoScale.SetReferenceParameter("_", Properties);
+
+            var photoTranslation = root.Compositor.CreateExpressionAnimation($"clamp(-{translationExp} * 0.2, 0, 140)");
+            photoTranslation.SetReferenceParameter("scrollViewer", properties);
+            photoTranslation.SetReferenceParameter("root", root);
+            photoTranslation.SetReferenceParameter("_", Properties);
 
             //var rootExp = "clamp(-scrollViewer.Translation.Y - (this.Target.Size.Y - 48 + 0), 0, target.Size.Y - this.Target.Size.Y)";
-            var controlsExp = "clamp(-scrollViewer.Translation.Y - (target.Size.Y - 40), 0, target.Size.Y)";
+            var controlsExp = $"-{translationExp} - (target.Size.Y - 40)";
             var controlsClip = root.Compositor.CreateExpressionAnimation(controlsExp);
             controlsClip.SetReferenceParameter("scrollViewer", properties);
             controlsClip.SetReferenceParameter("target", root);
+            controlsClip.SetReferenceParameter("_", Properties);
 
             //var buttonsExp = "clamp(-scrollViewer.Translation.Y - (target.Size.Y - this.Target.Size.Y - 56), 0, 72)";
-            var buttonsExp = "clamp(-scrollViewer.Translation.Y - (target.Size.Y - this.Target.Size.Y - 48), 0, 72)";
+            var buttonsExp = $"clamp(-{translationExp} - (target.Size.Y - this.Target.Size.Y - 56), 0, 72)";
             var buttonsTranslation = root.Compositor.CreateExpressionAnimation(buttonsExp);
             buttonsTranslation.SetReferenceParameter("scrollViewer", properties);
             buttonsTranslation.SetReferenceParameter("target", root);
+            buttonsTranslation.SetReferenceParameter("_", Properties);
 
             var buttonsOpacity = root.Compositor.CreateExpressionAnimation($"clamp(1 - {buttonsExp} / this.Target.Size.Y, 0, 1)");
             buttonsOpacity.SetReferenceParameter("scrollViewer", properties);
             buttonsOpacity.SetReferenceParameter("target", root);
+            buttonsOpacity.SetReferenceParameter("_", Properties);
 
             //var titleExp = "clamp(-scrollViewer.Translation.Y - 168 - 8, 0, 86)";
-            var titleExp = "clamp(-scrollViewer.Translation.Y - 184 - 8, 0, 86)";
+            var titleExp = $"clamp(-{translationExp} - 182, 0, buttons.Size.Y > 0 ? 86 : 11)";
             var titleTranslation = root.Compositor.CreateExpressionAnimation(titleExp);
             titleTranslation.SetReferenceParameter("scrollViewer", properties);
+            titleTranslation.SetReferenceParameter("buttons", buttons);
+            titleTranslation.SetReferenceParameter("_", Properties);
 
             //var titleScaleExp = "max(diff, 1 - clamp((-scrollViewer.Translation.Y - 184) / 32, 0, 1) * diff)";
-            var titleScaleExp = "clamp(1 - ((-scrollViewer.Translation.Y - 140) / 68) * 0.3, 0.7, 1)";
+            var titleScaleExp = $"clamp(1 - ((-{translationExp} - 124) / 68) * 0.3, 0.7, 1)";
             var titleScale = root.Compositor.CreateExpressionAnimation($"vector3({titleScaleExp}, {titleScaleExp}, 1)");
             titleScale.SetReferenceParameter("scrollViewer", properties);
+            titleScale.SetReferenceParameter("_", Properties);
 
             //var subtitleScaleExp = "max(diff, 1 - clamp((-scrollViewer.Translation.Y - 184) / 32, 0, 1) * diff)";
-            var subtitleScaleExp = "clamp(1 - ((-scrollViewer.Translation.Y - 140) / 68) * 0.143, 0.857, 1)";
+            var subtitleScaleExp = $"clamp(1 - ((-{translationExp} - 124) / 68) * 0.143, 0.857, 1)";
             var subtitleScale = root.Compositor.CreateExpressionAnimation($"vector3({subtitleScaleExp}, {subtitleScaleExp}, 1)");
             subtitleScale.SetReferenceParameter("scrollViewer", properties);
+            subtitleScale.SetReferenceParameter("_", Properties);
+
+            if (ViewModel.IsSavedMessages)
+            {
+                ClipperBackground.Margin = new Thickness(0, -48, 0, -8);
+
+                var clipperTranslation = root.Compositor.CreateExpressionAnimation($"-scrollViewer.Translation.Y + 32");
+                clipperTranslation.SetReferenceParameter("scrollViewer", properties);
+
+                background.StartAnimation("Translation.Y", clipperTranslation);
+            }
+            else
+            {
+                var clipperExpBranch1 = $"-{translationExp} - ((root.Size.Y - 88))";
+                var clipperExpBranch2 = $"-{translationExp} - (root.Size.Y - 48)";
+                var clipperExpDiff = $"{clipperExpBranch2} + -((target.Size.Y - 48) - -{translationExp}) / 64 * 256";
+                var clipperExpClamp = $"min(target.Size.Y - root.Size.Y + 64, {clipperExpDiff})";
+                var clipperTranslation = root.Compositor.CreateExpressionAnimation($"{translationExp} < 0 ? -{translationExp} > root.Size.Y - 48 && -{translationExp} < target.Size.Y - 48 ? {clipperExpBranch2} : -{translationExp} < target.Size.Y - 48 ? 0 : -{translationExp} < target.Size.Y - 24 ? {clipperExpClamp} : {clipperExpBranch1} : -{translationExp}");
+                clipperTranslation.SetReferenceParameter("scrollViewer", properties);
+                clipperTranslation.SetReferenceParameter("_", Properties);
+                clipperTranslation.SetReferenceParameter("root", root);
+                clipperTranslation.SetReferenceParameter("target", target);
+
+                background.StartAnimation("Translation.Y", clipperTranslation);
+            }
 
             controls.Clip = properties.Compositor.CreateInsetClip();
             controls.Clip.StartAnimation("TopInset", controlsClip);
@@ -377,9 +314,17 @@ namespace Telegram.Controls
             title.StartAnimation("Scale", titleScale);
             subtitle.StartAnimation("Translation.Y", titleTranslation);
             subtitle.StartAnimation("Scale", subtitleScale);
+            photo.StartAnimation("Scale", photoScale);
+            photoRoot.StartAnimation("Translation.Y", photoTranslation);
+            photo.CenterPoint = new Vector3(75, 140, 0);
         }
 
         #region Delegate
+
+        public void UpdateChatGifts(Chat chat)
+        {
+            GiftsCover.Update(_verticalOffset / (32 + 140 + 96), TitleRoot);
+        }
 
         public void UpdateChatAccentColors(Chat chat)
         {
@@ -404,14 +349,6 @@ namespace Telegram.Controls
                 Identity.Foreground = new SolidColorBrush(Colors.White);
                 BotVerified.ReplacementColor = new SolidColorBrush(Colors.White);
 
-                //HeaderRoot.BorderThickness = new Thickness(0, 0, 0, 1);
-                //HeaderRoot.CornerRadius = new CornerRadius(8, 0, 0, 0);
-                //HeaderRoot.Margin = new Thickness(0, 0, 0, -8);
-                //HeaderRoot.Padding = new Thickness(24, 16, 24, 8);
-                HeaderRoot.BorderThickness = new Thickness(1);
-                HeaderRoot.CornerRadius = new CornerRadius(4);
-                HeaderRoot.Margin = new Thickness(24, 16, 24, -8);
-                HeaderRoot.Padding = new Thickness(8, 16, 8, 8);
                 HeaderRoot.RequestedTheme = ElementTheme.Dark;
 
                 if (colors.BackgroundColors.Count > 1)
@@ -431,11 +368,11 @@ namespace Telegram.Controls
                         Offset = 1
                     });
 
-                    HeaderRoot.Background = gradient;
+                    HeaderBackground.Background = gradient;
                 }
                 else
                 {
-                    HeaderRoot.Background = new SolidColorBrush(colors.BackgroundColors[0]);
+                    HeaderBackground.Background = new SolidColorBrush(colors.BackgroundColors[0]);
                 }
 
                 UpdateProfileBackgroundCustomEmoji(colors);
@@ -446,17 +383,7 @@ namespace Telegram.Controls
                 Identity.ClearValue(ForegroundProperty);
                 BotVerified.ClearValue(AnimatedImage.ReplacementColorProperty);
 
-                //HeaderRoot.Background = null;
-                //HeaderRoot.BorderThickness = new Thickness(0);
-                //HeaderRoot.CornerRadius = new CornerRadius(0);
-                //HeaderRoot.Margin = new Thickness(24, 0, 24, -8);
-                //HeaderRoot.Padding = new Thickness(0, 32, 0, 0);
-                //HeaderRoot.RequestedTheme = ElementTheme.Default;
-                HeaderRoot.ClearValue(Panel.BackgroundProperty);
-                HeaderRoot.BorderThickness = new Thickness(1);
-                HeaderRoot.CornerRadius = new CornerRadius(4);
-                HeaderRoot.Margin = new Thickness(24, 16, 24, -8);
-                HeaderRoot.Padding = new Thickness(8, 16, 8, 8);
+                HeaderBackground.ClearValue(Panel.BackgroundProperty);
                 HeaderRoot.RequestedTheme = ElementTheme.Default;
 
                 UpdateProfileBackgroundCustomEmoji(null);
@@ -607,8 +534,10 @@ namespace Telegram.Controls
                 }
                 else
                 {
-                    Visibility = Visibility.Collapsed;
-                    return;
+                    Buttons.Visibility = Visibility.Collapsed;
+                    ControlsRoot.Visibility = Visibility.Collapsed;
+                    //Visibility = Visibility.Collapsed;
+                    //return;
                 }
             }
 
@@ -650,7 +579,11 @@ namespace Telegram.Controls
             {
                 Title.Text = ViewModel.ForumTopic.Info.Name;
             }
-            else if (chat.Id == ViewModel.ClientService.Options.MyId)
+            else if (ViewModel.SavedMessagesTopic != null)
+            {
+                Title.Text = ViewModel.ClientService.GetTitle(ViewModel.SavedMessagesTopic);
+            }
+            else if (chat.Id == ViewModel.ClientService.Options.MyId && !ViewModel.IsSavedMessages)
             {
                 Title.Text = chat.Title;
             }
@@ -668,15 +601,36 @@ namespace Telegram.Controls
             }
             else if (ViewModel.ForumTopic != null)
             {
-                FindName(nameof(Icon));
-                Icon.Source = new CustomEmojiFileSource(ViewModel.ClientService, ViewModel.ForumTopic.Info.Icon.CustomEmojiId);
-                Photo.Clear();
+                if (ViewModel.ForumTopic.Info.Icon.CustomEmojiId != 0)
+                {
+                    Icon.Source = new CustomEmojiFileSource(ViewModel.ClientService, ViewModel.ForumTopic.Info.Icon.CustomEmojiId);
+                    TopicIconRoot.Visibility = Visibility.Collapsed;
+                    TopicIconGeneral.Visibility = Visibility.Collapsed;
+                }
+                else if (ViewModel.ForumTopic.Info.IsGeneral)
+                {
+                    Icon.Source = null;
+                    TopicIconRoot.Visibility = Visibility.Collapsed;
+                    TopicIconGeneral.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    Icon.Source = null;
+                    TopicIconRoot.Visibility = Visibility.Visible;
+                    TopicIconGeneral.Visibility = Visibility.Collapsed;
+
+                    var brush = ForumTopicCell.GetIconGradient(ViewModel.ForumTopic.Info.Icon);
+
+                    TopicIconPath.Fill = brush;
+                    TopicIconPath.Stroke = new SolidColorBrush(brush.GradientStops[1].Color);
+                    TopicIconText.Text = InitialNameStringConverter.Convert(ViewModel.ForumTopic.Info.Name);
+                }
             }
             else
             {
-                UnloadObject(Icon);
+                Icon.Source = null;
 
-                if (chat.Id == ViewModel.ClientService.Options.MyId && ViewModel.ClientService.TryGetUser(chat, out User user))
+                if (chat.Id == ViewModel.ClientService.Options.MyId && !ViewModel.IsSavedMessages && ViewModel.ClientService.TryGetUser(chat, out User user))
                 {
                     Photo.SetUser(ViewModel.ClientService, user, 140);
                 }
@@ -697,7 +651,7 @@ namespace Telegram.Controls
 
         public void UpdateChatEmojiStatus(Chat chat)
         {
-            if (ViewModel.ClientService.TryGetUser(chat, out User user))
+            if (!ViewModel.IsSavedMessages && ViewModel.ClientService.TryGetUser(chat, out User user))
             {
                 Identity.SetStatus(ViewModel.ClientService, user, BotVerified);
             }
@@ -725,12 +679,12 @@ namespace Telegram.Controls
         {
             UpdateUserStatus(chat, user);
 
-            UserPhone.Badge = PhoneNumber.Format(user.PhoneNumber);
+            UserPhone.Content = PhoneNumber.Format(user.PhoneNumber);
             UserPhone.Visibility = string.IsNullOrEmpty(user.PhoneNumber) ? Visibility.Collapsed : Visibility.Visible;
 
             if (user.HasActiveUsername(out string username))
             {
-                Username.Badge = username;
+                Username.Content = username;
                 Username.Visibility = Visibility.Visible;
             }
             else
@@ -740,7 +694,7 @@ namespace Telegram.Controls
 
             UpdateUsernames(user.Usernames);
 
-            Description.Content = user.Type is UserTypeBot ? Strings.DescriptionPlaceholder : Strings.UserBio;
+            Description.Description = user.Type is UserTypeBot ? Strings.DescriptionPlaceholder : Strings.UserBio;
 
             if (secret is false)
             {
@@ -763,11 +717,11 @@ namespace Telegram.Controls
 
             if (user.Type is UserTypeBot userTypeBot)
             {
+                Call.Visibility = Visibility.Collapsed;
+                VideoCall.Visibility = Visibility.Collapsed;
+
                 if (userTypeBot.CanBeEdited)
                 {
-                    Call.Visibility = Visibility.Collapsed;
-                    VideoCall.Visibility = Visibility.Collapsed;
-
                     Edit.Visibility = Visibility.Visible;
                     Search.Visibility = Visibility.Visible;
                     Grid.SetColumn(Search, 2);
@@ -854,8 +808,11 @@ namespace Telegram.Controls
             }
             else
             {
-                Call.Visibility = Visibility.Visible;
-                Call.Content = Strings.Call;
+                if (user.Type is not UserTypeBot)
+                {
+                    Call.Visibility = Visibility.Visible;
+                    Call.Content = Strings.Call;
+                }
                 VideoCall.Visibility = fullInfo.CanBeCalled && fullInfo.SupportsVideoCalls ? Visibility.Visible : Visibility.Collapsed;
                 Search.Visibility = fullInfo.CanBeCalled && fullInfo.SupportsVideoCalls ? Visibility.Collapsed : Visibility.Visible;
                 Grid.SetColumn(Search, 2);
@@ -864,7 +821,7 @@ namespace Telegram.Controls
             if (fullInfo.BusinessInfo?.Location != null)
             {
                 Location.Visibility = Visibility.Visible;
-                Location.Badge = fullInfo.BusinessInfo.Location.Address;
+                Location.Content = fullInfo.BusinessInfo.Location.Address;
             }
 
             if (fullInfo.Birthdate != null)
@@ -874,15 +831,15 @@ namespace Telegram.Controls
 
                 if (today)
                 {
-                    UserBirthday.Content = Strings.ProfileBirthdayToday;
-                    UserBirthday.Badge = years != 0
+                    UserBirthday.Description = Strings.ProfileBirthdayToday;
+                    UserBirthday.Content = years != 0
                         ? Locale.Declension(Strings.R.ProfileBirthdayTodayValueYear, years, Formatter.Birthdate(fullInfo.Birthdate))
                         : string.Format(Strings.ProfileBirthdayTodayValue, Formatter.Birthdate(fullInfo.Birthdate));
                 }
                 else
                 {
-                    UserBirthday.Content = Strings.ProfileBirthday;
-                    UserBirthday.Badge = years != 0
+                    UserBirthday.Description = Strings.ProfileBirthday;
+                    UserBirthday.Content = years != 0
                         ? Locale.Declension(Strings.R.ProfileBirthdayValueYear, years, Formatter.Birthdate(fullInfo.Birthdate))
                         : string.Format(Strings.ProfileBirthdayValue, Formatter.Birthdate(fullInfo.Birthdate));
                 }
@@ -920,10 +877,11 @@ namespace Telegram.Controls
                 var emoji = new CustomEmojiFileSource(ViewModel.ClientService, fullInfo.BotVerification.IconCustomEmojiId);
                 var text = fullInfo.BotVerification.CustomDescription.Text.Length > 0
                     ? fullInfo.BotVerification.CustomDescription
-                    : Strings.BotVerifierRepresentatives.AsFormattedText();
+                    : string.Format(Strings.BotVerifierRepresentatives, verifierBotUser.FirstName).AsFormattedText();
 
-                TextBlockHelper.SetFormattedText(BotVerifiedText, text);
-                BotVerifiedInfo.Source = emoji;
+                BotVerifiedText.SetText(ViewModel.ClientService, ClientEx.Format("{0} {1}", ClientEx.CustomEmoji(fullInfo.BotVerification.IconCustomEmojiId), text));
+                BotVerifiedText.SetQuery(string.Empty);
+
                 BotVerifiedRoot.Visibility = Visibility.Visible;
             }
             else
@@ -977,7 +935,7 @@ namespace Telegram.Controls
             Subtitle.Text = Locale.Declension(Strings.R.Members, group.MemberCount);
             SubtitleWhen.Visibility = Visibility.Collapsed;
 
-            Description.Content = Strings.DescriptionPlaceholder;
+            Description.Description = Strings.DescriptionPlaceholder;
 
             UserPhone.Visibility = Visibility.Collapsed;
             Location.Visibility = Visibility.Collapsed;
@@ -1075,19 +1033,47 @@ namespace Telegram.Controls
                 SubtitleWhen.Visibility = Visibility.Collapsed;
             }
 
-            Description.Content = Strings.DescriptionPlaceholder;
+            Description.Description = Strings.DescriptionPlaceholder;
 
-            if (group.HasActiveUsername(out string username))
+            if (ViewModel.ForumTopic != null)
             {
-                Username.Badge = username;
-                Username.Visibility = Visibility.Visible;
+                ViewModel.ClientService.Send(new GetForumTopicLink(chat.Id, ViewModel.ForumTopic.Info.MessageThreadId), result =>
+                {
+                    if (result is MessageLink link)
+                    {
+                        this.BeginOnUIThread(() =>
+                        {
+                            Username.Content = link.Link;
+                            Username.Visibility = Visibility.Visible;
+
+                            if (link.IsPublic)
+                            {
+                                ActiveUsernames.Inlines.Clear();
+                                ActiveUsernames.Inlines.Add(new Run { Text = Strings.InviteLink });
+                            }
+                            else
+                            {
+                                ActiveUsernames.Inlines.Clear();
+                                ActiveUsernames.Inlines.Add(new Run { Text = Strings.InviteLinkPrivate });
+                            }
+                        });
+                    }
+                });
             }
             else
             {
-                Username.Visibility = Visibility.Collapsed;
-            }
+                if (group.HasActiveUsername(out string username))
+                {
+                    Username.Content = username;
+                    Username.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    Username.Visibility = Visibility.Collapsed;
+                }
 
-            UpdateUsernames(group.Usernames);
+                UpdateUsernames(group.Usernames);
+            }
 
             Location.Visibility = group.HasLocation ? Visibility.Visible : Visibility.Collapsed;
 
@@ -1148,7 +1134,7 @@ namespace Telegram.Controls
 
             BusinessHours.Visibility = Visibility.Collapsed;
 
-            if (fullInfo == null)
+            if (fullInfo == null || ViewModel.ForumTopic != null)
             {
                 return;
             }
@@ -1157,7 +1143,7 @@ namespace Telegram.Controls
             Description.Visibility = string.IsNullOrEmpty(fullInfo.Description) ? Visibility.Collapsed : Visibility.Visible;
 
             Location.Visibility = fullInfo.Location != null ? Visibility.Visible : Visibility.Collapsed;
-            Location.Badge = fullInfo.Location?.Address;
+            Location.Content = fullInfo.Location?.Address;
 
             if (group.IsChannel && group.Status is ChatMemberStatusCreator or ChatMemberStatusAdministrator)
             {
@@ -1196,10 +1182,10 @@ namespace Telegram.Controls
                 var emoji = new CustomEmojiFileSource(ViewModel.ClientService, fullInfo.BotVerification.IconCustomEmojiId);
                 var text = fullInfo.BotVerification.CustomDescription.Text.Length > 0
                     ? fullInfo.BotVerification.CustomDescription
-                    : Strings.BotVerifierRepresentatives.AsFormattedText();
+                    : string.Format(Strings.BotVerifierRepresentatives, verifierBotUser.FirstName).AsFormattedText();
 
-                TextBlockHelper.SetFormattedText(BotVerifiedText, text);
-                BotVerifiedInfo.Source = emoji;
+                BotVerifiedText.SetText(ViewModel.ClientService, ClientEx.Format("{0} {1}", ClientEx.CustomEmoji(fullInfo.BotVerification.IconCustomEmojiId), text));
+                BotVerifiedText.SetQuery(string.Empty);
                 BotVerifiedRoot.Visibility = Visibility.Visible;
             }
             else
@@ -1878,6 +1864,95 @@ namespace Telegram.Controls
         private void Identity_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.ShowPromo();
+        }
+
+        private void HeaderPhoto_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var visual = ElementComposition.GetElementVisual(HeaderPhoto);
+            visual.CenterPoint = new Vector3(HeaderPhoto.ActualSize / 2, 0);
+        }
+
+        private void TitleRoot_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var title = ElementComposition.GetElementVisual(TitleRoot);
+            title.CenterPoint = new Vector3(TitleRoot.ActualSize.X / 2, TitleRoot.ActualSize.Y, 0);
+        }
+
+        private void SubtitleRoot_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            var subtitle = ElementComposition.GetElementVisual(SubtitleRoot);
+            subtitle.CenterPoint = new Vector3(SubtitleRoot.ActualSize.X / 2, 0, 0);
+        }
+
+        private void Pattern_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel.IsSavedMessages)
+            {
+                Pattern.Update(float.MaxValue);
+                GiftsCover.Update(float.MaxValue, TitleRoot);
+
+                ShowHideSubtitle(true);
+                ShowHideBackground(true);
+            }
+        }
+
+        private void GiftsCover_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            GiftsCover.Update(_verticalOffset / (32 + 140 + 96), TitleRoot);
+        }
+    }
+
+    public class ProfileButtonsGrid : Grid
+    {
+        private int _columns;
+
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            var columns = 0;
+
+            foreach (var child in Children)
+            {
+                if (child.Visibility == Visibility.Collapsed)
+                {
+                    continue;
+                }
+
+                columns++;
+            }
+
+            var column = new Size(Math.Max(0, (availableSize.Width - ColumnSpacing * (columns - 1)) / columns), availableSize.Height);
+            var height = 0d;
+
+            foreach (var child in Children)
+            {
+                child.Measure(column);
+
+                if (child.Visibility == Visibility.Visible)
+                {
+                    height = Math.Max(height, child.DesiredSize.Height);
+                }
+            }
+
+            _columns = columns;
+            return new Size(availableSize.Width, height);
+        }
+
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            var x = 0d;
+            var column = (finalSize.Width - ColumnSpacing * (_columns - 1)) / _columns;
+
+            foreach (var child in Children)
+            {
+                child.Arrange(new Rect(x, 0, column, finalSize.Height));
+
+                if (child.Visibility == Visibility.Visible)
+                {
+                    x += column + ColumnSpacing;
+                }
+            }
+
+            return finalSize;
         }
     }
 }

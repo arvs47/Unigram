@@ -321,6 +321,7 @@ namespace Telegram.Controls.Messages
             _dateLabel = Formatter.Time(date);
             UpdateLabel();
             UpdateTicks(outgoing, outgoing ? MessageTicksState.Read : MessageTicksState.None);
+            UpdateMessageOutgoing(outgoing);
         }
 
         public void UpdateMessageInteractionInfo(MessageViewModel message)
@@ -434,9 +435,10 @@ namespace Telegram.Controls.Messages
                 return;
             }
 
-            if (message.IsOutgoing && !message.IsChannelPost && !message.IsSaved)
+            var outgoing = (message.IsOutgoing && !message.IsChannelPost) || (message.IsSaved && message.ForwardInfo?.Source is { IsOutgoing: true });
+            if (outgoing)
             {
-                var maxId = message.Topic?.LastReadOutboxMessageId ?? message.Chat.LastReadOutboxMessageId;
+                var maxId = message.LastReadOutboxMessageId;
                 var messageHash = message.ChatId ^ message.Id;
 
                 if (message.SendingState is MessageSendingStateFailed)

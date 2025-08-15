@@ -1,4 +1,10 @@
-﻿using Microsoft.Graphics.Canvas.Geometry;
+//
+// Copyright Fela Ameghino 2015-2025
+//
+// Distributed under the GNU General Public License v3.0. (See accompanying
+// file LICENSE or copy at https://www.gnu.org/licenses/gpl-3.0.txt)
+//
+using Microsoft.Graphics.Canvas.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -78,7 +84,7 @@ namespace Telegram.Controls.Messages
                     new TextEntity(ForwardText.Text.Length, ForwardLink.Text.Length, new TextEntityTypeBold())
                 };
 
-                var rectangles2 = PlaceholderImageHelper.Current.LineMetrics(ForwardLabel.Text, entities, 12, double.MaxValue, false);
+                var rectangles2 = PlaceholderImageHelper.Foreground.LineMetrics(ForwardLabel.Text, entities, 12, double.MaxValue, false);
 
                 //var contentEnd = ForwardLabel.ContentEnd.GetCharacterRect(ForwardLabel.ContentEnd.LogicalDirection);
                 //if (contentEnd.Right <= 0)
